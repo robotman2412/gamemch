@@ -2,6 +2,7 @@
 // This file contains a simple hello world app which you can base you own apps on.
 
 #include "main.h"
+#include "btwrapper.h"
 
 static pax_buf_t buf;
 xQueueHandle buttonQueue;
@@ -36,35 +37,23 @@ void app_main() {
     // Init (but not connect to) WiFi.
     wifi_init();
     
-    while (1) {
-        // Pick a random background color.
-        int hue = esp_random() & 255;
-        pax_col_t col = pax_col_hsv(hue, 255 /*saturation*/, 255 /*brighness*/);
-        
-        // Show some random color hello world.
-        // Draw the background with aforementioned random color.
-        pax_background(&buf, col);
-        // This text is shown on screen.
-        char             *text = "Hello, World!";
-        // Pick the font to draw in (this is the only one that looks nice this big).
-        const pax_font_t *font = pax_font_saira_condensed;
-        // Determine how large the text is so it can be centered.
-        pax_vec1_t        dims = pax_text_size(font, font->default_size, text);
-        // Use info to draw the centered text.
-        pax_draw_text(
-            // Buffer to draw to.
-            &buf, 0xff000000,
-            // Font and size to use.
-            font, font->default_size,
-            // Position (top left corner) of the app.
-            (buf.width  - dims.x) / 2.0,
-            (buf.height - dims.y) / 2.0,
-            // The text to be shown.
-            text
-        );
-        // Draws the entire graphics buffer to the screen.
+    pax_background(&buf, 0);
+    pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Connecting BlueTooth...");
+    disp_flush();
+    
+    bt_start();
+    
+    if (1) {
+        pax_background(&buf, 0);
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Connected!");
         disp_flush();
-        
+    } else {
+        pax_background(&buf, 0);
+        pax_draw_text(&buf, 0xffff0000, pax_font_saira_regular, 18, 5, 5, "Erreur");
+        disp_flush();
+    }
+    
+    while (1) {
         // Await any button press and do another cycle.
         // Structure used to receive data.
         rp2040_input_message_t message;
