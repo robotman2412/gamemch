@@ -1,6 +1,7 @@
 
 #include "connection.h"
 #include "esp_log.h"
+#include "string.h"
 
 static const char *TAG = "connection";
 
@@ -17,6 +18,42 @@ Connection::Connection(SendCallback callback) {
 Connection::~Connection() {
 	if (peer) delete peer;
 	delete dataBuf;
+}
+
+// Handle and decode message data.
+void Connection::decodeMessage(char *data) {
+	char *msg;
+	while (data && *data) {
+		// Find length of part.
+		char *end = strchr(data, ';');
+		size_t len;
+		if (end) {
+			len = end - data;
+			*end = 0;
+		} else {
+			len = strlen(data);
+		}
+		
+		// Find splitter.
+		char *split = strchr(data, ':');
+		if (split) {
+			*split = 0;
+			msg = split + 1;
+			// Notify listeners.
+			for (size_t i = 0; i < dataCallbacks.size(); i++) {
+				dataCallbacks[i](this, data, msg);
+			}
+		} else {
+			// No splitter, no topic.
+			for (size_t i = 0; i < dataCallbacks.size(); i++) {
+				dataCallbacks[i](this, "", data);
+			}
+		}
+		
+		
+		// ASet pointer to next part, if any.
+		data = end ? end + 1 : 0;
+	}
 }
 
 // Called by the connection's task when multiply bytes of data are recieved.
@@ -56,10 +93,8 @@ void Connection::onData(char data) {
 			// Null-terminate data.
 			recvData = false;
 			dataBuf[dataWriteIndex] = 0;
-			// Notify listeners.
-			for (size_t i = 0; i < dataCallbacks.size(); i++) {
-				dataCallbacks[i](this, dataBuf);
-			}
+			// This will edit dataBuf while decoding.
+			decodeMessage(dataBuf);
 		}
 	} else if (dataWriteIndex >= Connection_BUF_LEN) {
 		// Data buffer is full.
@@ -72,11 +107,34 @@ void Connection::onData(char data) {
 	}
 }
 
-// Send data to the peer.
+// Send data to the peer without topic.
 void Connection::send(const char *cstr) {
-	sendCallback(this, cstr);
+	// Pack it in a neat little buffer.
+	char *buf = new char[strlen(cstr)+4];
+	buf[0] = '\002';
+	buf[1] = ':';
+	memcpy(&buf[2], cstr, strlen(cstr));
+	buf[strlen(cstr)+2] = '\003';
+	buf[strlen(cstr)+3] = 0;
+	// Send it along.
+	sendCallback(this, buf);
+	free(buf);
 }
-		
+
+// Send data to the peer with topic.
+void Connection::send(const char *topic, const char *cstr) {
+	// Pack it in a neat little buffer.
+	char *buf = new char[strlen(topic)+strlen(cstr)+4];
+	buf[0] = '\002';
+	strcpy(buf, topic);
+	strcat(buf, ":");
+	strcat(buf, cstr);
+	strcat(buf, "\003");
+	// Send it along.
+	sendCallback(this, buf);
+	free(buf);
+}
+
 // Sets the status and notifies all listeners.
 void Connection::setStatus(Status newStatus) {
 	status = newStatus;

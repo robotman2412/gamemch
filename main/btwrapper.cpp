@@ -9,6 +9,8 @@
 #include <string.h>
 #include <malloc.h>
 
+// #define USE_BLE
+
 static const char *TAG = "bluetooth";
 #define SPP_SERVER_NAME "ESP32_SPP_SERVER"
 #define DEV_NAME "ESP32 SPP test"
@@ -174,7 +176,7 @@ void bt_start() {
     char bda_str[18] = {0};
     esp_err_t ret=0;
 
-    // ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
+    ESP_ERROR_CHECK(esp_bt_controller_mem_release(ESP_BT_MODE_BLE));
 
     esp_bt_controller_config_t bt_cfg = BT_CONTROLLER_INIT_CONFIG_DEFAULT();
     if ((ret = esp_bt_controller_init(&bt_cfg)) != ESP_OK) {
@@ -182,7 +184,7 @@ void bt_start() {
         return;
     }
 
-    if ((ret = esp_bt_controller_enable(ESP_BT_MODE_BLE)) != ESP_OK) {
+    if ((ret = esp_bt_controller_enable(ESP_BT_MODE_CLASSIC_BT)) != ESP_OK) {
         ESP_LOGE(TAG, "%s enable controller failed: %s\n", __func__, esp_err_to_name(ret));
         return;
     }
@@ -236,10 +238,8 @@ void bluetoothSendCallback(Connection *from, const char *cstr) {
         if (iter->second == from) {
             handle = iter->first;
             
-            uint8_t c_2 = 2, c_3 = 3;
-            esp_spp_write(handle, 1, &c_2);
             esp_spp_write(handle, strlen(cstr), (uint8_t *) cstr);
-            esp_spp_write(handle, 1, &c_3);
+            esp_spp_write(handle, 2, (uint8_t *) "\r\n");
             ESP_LOGI(TAG, "Message to %s: %s", from->peer, cstr);
             return;
         }

@@ -65,9 +65,11 @@ extern "C" void app_main() {
 }
 
 // Data event handling.
-void mainDataCallback(Connection *from, const char *cstr) {
-    ESP_LOGI(TAG, "Message from %s: %s", from->peer, cstr);
-    from->send("This is a funny data you get for respond!\r\n");
+void mainDataCallback(Connection *from, const char *type, const char *data) {
+    if (*type) ESP_LOGI(TAG, "Message from %s: %s: %s", from->peer, type, data);
+    else ESP_LOGI(TAG, "Message from %s: %s", from->peer, data);
+    from->send("This without topic");
+    from->send("This", "With topic");
 }
 
 // Status event handling.

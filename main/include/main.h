@@ -46,6 +46,6 @@ void exit_to_launcher();
 #include "connection.h"
 
 // Data event handling.
-void mainDataCallback(Connection *from, const char *cstr);
+void mainDataCallback(Connection *from, const char *type, const char *data);
 // Status event handling.
 void mainStatusCallback(Connection *from);

@@ -24,6 +24,8 @@ class Connection {
 		char  *dataBuf;
 		// Write index in data buffer.
 		size_t dataWriteIndex;
+		// Handle and decode message data.
+		void decodeMessage(char *data);
 		
 	public:
 		// Status of a connection.
@@ -35,7 +37,7 @@ class Connection {
 			ERROR,
 		} Status;
 		// Callback for data recieved events.
-		typedef void(*DataCallback)(Connection *from, const char *cstr);
+		typedef void(*DataCallback)(Connection *from, const char *type, const char *data);
 		// Callback for status events.
 		typedef void(*StatusCallback)(Connection *from);
 		// Callback to send data to peer.
@@ -66,12 +68,13 @@ class Connection {
 		// Called by the connection's task when one byte of data is recieved.
 		void onData(char data);
 		
-		// Send data to the peer.
+		// Send data to the peer without topic.
 		void send(const char *cstr);
+		// Send data to the peer with topic.
+		void send(const char *topic, const char *cstr);
 		
 		// Sets the status and notifies all listeners.
 		void setStatus(Status newStatus);
-		
 		// Get the name of the status thingy.
 		const char *statusToName();
 };
