@@ -17,7 +17,7 @@ extern "C" {
 #include "freertos/FreeRTOS.h"
 #include "freertos/task.h"
 #include "freertos/queue.h"
-#include "esp_system.h"
+#include <esp_system.h>
 #include "esp_log.h"
 #include "nvs.h"
 #include "nvs_flash.h"
@@ -43,3 +43,9 @@ void exit_to_launcher();
 
 // For BlueTooth connectivity.
 #include "btwrapper.h"
+#include "connection.h"
+
+// Data event handling.
+void mainDataCallback(Connection *from, const char *cstr);
+// Status event handling.
+void mainStatusCallback(Connection *from);

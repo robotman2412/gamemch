@@ -46,16 +46,6 @@ extern "C" void app_main() {
     
     bt_start();
     
-    if (1) {
-        pax_background(&buf, 0);
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Connected!");
-        disp_flush();
-    } else {
-        pax_background(&buf, 0);
-        pax_draw_text(&buf, 0xffff0000, pax_font_saira_regular, 18, 5, 5, "Erreur");
-        disp_flush();
-    }
-    
     while (1) {
         // Await any button press and do another cycle.
         // Structure used to receive data.
@@ -67,6 +57,20 @@ extern "C" void app_main() {
         if (message.input == RP2040_INPUT_BUTTON_HOME && message.state) {
             // If home is pressed, exit to launcher.
             exit_to_launcher();
+        } else if (message.input == RP2040_INPUT_BUTTON_ACCEPT && message.state) {
+            // Tell bluetooth to start a scan.
+            bt_scan();
         }
     }
+}
+
+// Data event handling.
+void mainDataCallback(Connection *from, const char *cstr) {
+    ESP_LOGI(TAG, "Message from %s: %s", from->peer, cstr);
+    from->send("This is a funny data you get for respond!\r\n");
+}
+
+// Status event handling.
+void mainStatusCallback(Connection *from) {
+    ESP_LOGI(TAG, "Connection status for %s changed to %s", from->peer, from->statusToName());
 }
