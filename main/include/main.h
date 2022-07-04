@@ -1,6 +1,10 @@
 
 #pragma once
 
+#ifdef __cplusplus
+extern "C" {
+#endif //__cplusplus
+
 // For pin mappings.
 #include "hardware.h"
 // For graphics.
@@ -20,8 +24,6 @@
 // For WiFi connectivity.
 #include "wifi_connect.h"
 #include "wifi_connection.h"
-// For BlueTooth connectivity.
-#include "btwrapper.h"
 // For exiting to the launcher.
 #include "soc/rtc.h"
 #include "soc/rtc_cntl_reg.h"
@@ -34,3 +36,10 @@ void disp_flush();
 
 // Exits the app, returning to the launcher.
 void exit_to_launcher();
+
+#ifdef __cplusplus
+}
+#endif //__cplusplus
+
+// For BlueTooth connectivity.
+#include "btwrapper.h"

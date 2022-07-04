@@ -7,20 +7,22 @@
 static pax_buf_t buf;
 xQueueHandle buttonQueue;
 
-static const char *TAG = "mch2022-demo-app";
+static const char *TAG = "main";
 
 // Updates the screen with the last drawing.
-void disp_flush() {
-    ili9341_write(get_ili9341(), buf.buf);
+extern "C" void disp_flush() {
+    ili9341_write(get_ili9341(), buf.buf_8bpp);
 }
 
 // Exits the app, returning to the launcher.
-void exit_to_launcher() {
+extern "C" void exit_to_launcher() {
     REG_WRITE(RTC_CNTL_STORE0_REG, 0);
     esp_restart();
 }
 
-void app_main() {
+extern "C" void app_main() {
+    ESP_LOGI(TAG, "Initialising hardware...");
+    
     // Init the screen, the I2C and the SPI busses.
     bsp_init();
     // Init the RP2040 (responsible for buttons among other important things).
@@ -28,15 +30,16 @@ void app_main() {
     // This queue is used to await button presses.
     buttonQueue = get_rp2040()->queue;
     
+    ESP_LOGI(TAG, "Initialising software...");
+    
     // Init graphics for the screen.
     pax_buf_init(&buf, NULL, 320, 240, PAX_BUF_16_565RGB);
-    
     // Init NVS.
     nvs_flash_init();
-    
     // Init (but not connect to) WiFi.
     wifi_init();
     
+    ESP_LOGI(TAG, "Initialising radio...");
     pax_background(&buf, 0);
     pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Connecting BlueTooth...");
     disp_flush();
