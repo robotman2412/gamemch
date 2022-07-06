@@ -3,11 +3,20 @@
 
 #include "main.h"
 #include "btwrapper.h"
+#include "espnowwrapper.h"
+#include "esp_timer.h"
 
 static pax_buf_t buf;
 xQueueHandle buttonQueue;
 
 static const char *TAG = "main";
+
+// Next time at which to broadcast info.
+static uint64_t nextInfoBroadcast = 0;
+// Interval between info broadcasts.
+static uint64_t broadcastInterval = 3000;
+// Current time.
+static uint64_t now = 0;
 
 // Updates the screen with the last drawing.
 extern "C" void disp_flush() {
@@ -41,35 +50,49 @@ extern "C" void app_main() {
     
     ESP_LOGI(TAG, "Initialising radio...");
     pax_background(&buf, 0);
-    pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Connecting BlueTooth...");
+    pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Helo!");
     disp_flush();
     
-    bt_start();
+    connection_start();
+    espnow_start();
     
     while (1) {
-        // Await any button press and do another cycle.
-        // Structure used to receive data.
+        now = esp_timer_get_time() / 100;
+        
+        if (now >= nextInfoBroadcast) {
+            // Broadcast info.
+            broadcastInfo();
+            nextInfoBroadcast = now + broadcastInterval;
+        }
+        
+        // Await any button press or the next broadcast time.
         rp2040_input_message_t message;
-        // Await forever (because of portMAX_DELAY), a button press.
-        xQueueReceive(buttonQueue, &message, portMAX_DELAY);
+        xQueueReceive(buttonQueue, &message, pdMS_TO_TICKS(nextInfoBroadcast - now));
         
         // Is the home button currently pressed?
         if (message.input == RP2040_INPUT_BUTTON_HOME && message.state) {
             // If home is pressed, exit to launcher.
             exit_to_launcher();
         } else if (message.input == RP2040_INPUT_BUTTON_ACCEPT && message.state) {
-            // Tell bluetooth to start a scan.
-            bt_scan();
+            // Tell espnow to broadcast.
+            espnow_broadcast("status", "awaiting_companion");
         }
     }
 }
 
+
+
+// Broadcast info obout ourselves.
+void broadcastInfo() {
+    // espnow_broadcast("nick",  "Teh RoboR");
+    // espnow_broadcast("score", "0");
+}
+
+
+
 // Data event handling.
 void mainDataCallback(Connection *from, const char *type, const char *data) {
-    if (*type) ESP_LOGI(TAG, "Message from %s: %s: %s", from->peer, type, data);
-    else ESP_LOGI(TAG, "Message from %s: %s", from->peer, data);
-    from->send("This without topic");
-    from->send("This", "With topic");
+    ESP_LOGI(TAG, "Message from %s: %s: %s", from->peer, type, data);
 }
 
 // Status event handling.

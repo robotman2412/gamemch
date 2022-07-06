@@ -45,6 +45,9 @@ void exit_to_launcher();
 #include "btwrapper.h"
 #include "connection.h"
 
+// Broadcast info obout ourselves.
+void broadcastInfo();
+
 // Data event handling.
 void mainDataCallback(Connection *from, const char *type, const char *data);
 // Status event handling.
