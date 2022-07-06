@@ -6,9 +6,10 @@
 #include <vector>
 
 static TaskHandle_t handle;
-std::vector<Connection *> *connections;
+std::vector<Connection *> connections;
 
 static const char *TAG = "connection";
+int nearby = 0;
 
 static inline int8_t unhexc(char data) {
 	switch (data) {
@@ -46,7 +47,7 @@ Connection::Connection(SendCallback callback) {
 	sendCallback = callback;
 	retransmit   = 3;
 	// Add this to the connection list.
-	// connections->push_back(this);
+	connections.push_back(this);
 }
 
 // Delete the connection.
@@ -263,28 +264,31 @@ const char *Connection::statusToName() {
 static void connectionTask(void *ignored) {
 	while (1) {
 		// Wait a bit.
-		vTaskDelay(pdMS_TO_TICKS(Connection_TIMEOUT / 2));
+		vTaskDelay(pdMS_TO_TICKS(500));
 		uint64_t now = esp_timer_get_time() / 1000;
 		
+		int new_nearby = 0;
 		// Check connections for DEATH.
-		for (size_t i = 0; i < connections->size(); i++) {
-			// Connection *conn = connections[i];
-			// if (!conn) continue;
+		for (size_t i = 0; i < connections.size(); i++) {
+			Connection *conn = connections[i];
+			if (!conn) continue;
 			
-			// if (conn->timeout < now) {
-			// 	if (conn->status != Connection::CLOSED) {
-			// 		conn->setStatus(Connection::CLOSED);
-			// 		conn->timeout = now + Connection_TIMEOUT;
-			// 	} else {
-			// 		// TODO: Free it.
-			// 	}
-			// }
+			if (conn->timeout < now) {
+				if (conn->status != Connection::CLOSED) {
+					conn->setStatus(Connection::CLOSED);
+					conn->timeout = now + Connection_TIMEOUT;
+				} else {
+					// TODO: Free it.
+				}
+			} else if (conn->status == Connection::OPEN) {
+				new_nearby ++;
+			}
 		}
+		nearby = new_nearby;
 	}
 }
 
 // Start the connection upkeeper task.
 void connection_start() {
-	// connections = new std::vector<Connection *>();
-	// xTaskCreate(connectionTask, "conn worker", 2048, NULL, tskIDLE_PRIORITY, &handle);
+	xTaskCreate(connectionTask, "conn worker", 2048, NULL, tskIDLE_PRIORITY, &handle);
 }

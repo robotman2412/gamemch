@@ -70,8 +70,6 @@ void espnow_broadcast_raw(const char *msg) {
     esp_err_t res = esp_now_send(broadcast_mac, (const uint8_t *) buffer, strlen(buffer));
     if (res) {
         ESP_LOGE(TAG, "Broadcast error: %s", esp_err_to_name(res));
-    } else {
-        ESP_LOGI(TAG, "Should be sent");
     }
     
     delete buffer;
@@ -82,12 +80,10 @@ void espnow_broadcast(const char *topic, const char *data) {
 }
 
 void espnowRecvCallback(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
-    ESP_LOGI(TAG, "Data received!");
-    
     if (data_len < sizeof(magic) || memcmp(data, magic, sizeof(magic))) {
         // This is not data for me.
         ESP_LOGI(TAG, "Magic is wrong.");
-        // return;
+        return;
     }
     mac_t converter = { .pack = 0 };
     memcpy(converter.addr, mac_addr, 6);

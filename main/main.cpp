@@ -49,14 +49,13 @@ extern "C" void app_main() {
     wifi_init();
     
     ESP_LOGI(TAG, "Initialising radio...");
-    pax_background(&buf, 0);
-    pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Helo!");
-    disp_flush();
     
     connection_start();
     espnow_start();
     
     while (1) {
+        graphics_task();
+        
         now = esp_timer_get_time() / 100;
         
         if (now >= nextInfoBroadcast) {
@@ -84,8 +83,8 @@ extern "C" void app_main() {
 
 // Broadcast info obout ourselves.
 void broadcastInfo() {
-    // espnow_broadcast("nick",  "Teh RoboR");
-    // espnow_broadcast("score", "0");
+    espnow_broadcast("nick",  "Teh RoboR");
+    espnow_broadcast("score", "0");
 }
 
 

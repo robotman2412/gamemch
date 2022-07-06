@@ -25,6 +25,9 @@
 // Start the connection upkeeper task.
 void connection_start();
 
+// An estimate of nearby people.
+extern int nearby;
+
 class Connection {
 	public:
 		// Data handling state.
