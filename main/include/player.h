@@ -1,16 +1,40 @@
 
 #pragma once
 
+class Player;
+
+typedef enum {
+    // Not currently interacting.
+    IDLE,
+    // Looking to interact (with or without companion).
+    AWAITING,
+    // Currently interacting with companion.
+    INTERACTING,
+} InteractStatus;
+
+extern const char *interactStatusNames[3];
+
+#include "connection.h"
+
 class Player {
     private:
         int lastUploadedScore;
         int score;
         char *nickname;
+        InteractStatus status;
         
     public:
+        // Whether to broadcast status updates.
+        bool doBroadcast;
+        
+        // Make an empty player.
+        Player();
+        
         // Make a new player.
         // Makes a copy of the nickname.
-        Player(const char *nickname);
+        Player(const char *newNickname);
+        
+        ~Player();
         
         // Handle a message for this player.
         void dataCallback(Connection *from, const char *type, const char *data);
@@ -23,13 +47,24 @@ class Player {
         // Get a player's nickname.
         const char *getNick();
         
-        // Update a player's score.
+        // Add to a player's score, negative is allowed but capped at 0.
+        int addScore(int delta);
+        // Set a player's score.
         int setScore(int newScore);
         // Get a player's score.
         int getScore();
+        
+        // Set interacting status.
+        InteractStatus setStatus(InteractStatus newStatus);
+        // Get interacting status.
+        InteractStatus getStatus();
 };
 
 // Loads a yourself as a player from NVS.
 Player *loadFromNvs();
 // Stores yourself as a player to NVS.
 void storeToNvs(Player *player);
+// Handle a message for a player.
+void playerDataCallback(Connection *from, const char *type, const char *data);
+// Handle a connection status update for a player.
+void playerStatusCallback(Connection *from);

@@ -2,12 +2,13 @@
 // This file contains a simple hello world app which you can base you own apps on.
 
 #include "main.h"
-#include "btwrapper.h"
-#include "espnowwrapper.h"
+#include "graphics.h"
 #include "esp_timer.h"
 
-static pax_buf_t buf;
+pax_buf_t buf;
 xQueueHandle buttonQueue;
+Player *localPlayer;
+Player *companion;
 
 static const char *TAG = "main";
 
@@ -50,13 +51,17 @@ extern "C" void app_main() {
     
     ESP_LOGI(TAG, "Initialising radio...");
     
+    // Start tasks.
     connection_start();
     espnow_start();
+    
+    // Load local player.
+    localPlayer = loadFromNvs();
     
     while (1) {
         graphics_task();
         
-        now = esp_timer_get_time() / 100;
+        now = esp_timer_get_time() / 1000;
         
         if (now >= nextInfoBroadcast) {
             // Broadcast info.
@@ -72,9 +77,12 @@ extern "C" void app_main() {
         if (message.input == RP2040_INPUT_BUTTON_HOME && message.state) {
             // If home is pressed, exit to launcher.
             exit_to_launcher();
-        } else if (message.input == RP2040_INPUT_BUTTON_ACCEPT && message.state) {
-            // Tell espnow to broadcast.
-            espnow_broadcast("status", "awaiting_companion");
+        } else if (message.input == RP2040_INPUT_JOYSTICK_UP && message.state) {
+            // Increment our score.
+            localPlayer->addScore(1);
+        } else if (message.input == RP2040_INPUT_JOYSTICK_DOWN && message.state) {
+            // Decrement our score.
+            localPlayer->addScore(-1);
         }
     }
 }
@@ -83,8 +91,9 @@ extern "C" void app_main() {
 
 // Broadcast info obout ourselves.
 void broadcastInfo() {
-    espnow_broadcast("nick",  "Teh RoboR");
-    espnow_broadcast("score", "0");
+    // Advertise our presence by broadcasting our nickname and score.
+    espnow_broadcast("nick",  localPlayer->getNick());
+    espnow_broadcast_num("score", localPlayer->getScore());
 }
 
 

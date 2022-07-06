@@ -46,6 +46,9 @@ Connection::Connection(SendCallback callback) {
 	recvPhase    = Connection::IDLE;
 	sendCallback = callback;
 	retransmit   = 3;
+	dataCallbacks.push_back(playerDataCallback);
+	statusCallbacks.push_back(playerStatusCallback);
+	player       = new Player();
 	// Add this to the connection list.
 	connections.push_back(this);
 }
@@ -54,6 +57,7 @@ Connection::Connection(SendCallback callback) {
 Connection::~Connection() {
 	if (peer) delete peer;
 	delete dataBuf;
+	delete player;
 }
 
 
@@ -229,7 +233,7 @@ void Connection::send(const char *topic, const char *cstr) {
 	snprintf(buf+offs, Connection_CHUNK_LEN+1-offs, "\004%08x\005", sum);
 	
 	// Send it along.
-	sendCallback(this, buf);
+	if (sendCallback) sendCallback(this, buf);
 	delete buf;
 }
 

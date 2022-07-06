@@ -41,9 +41,17 @@ void exit_to_launcher();
 }
 #endif //__cplusplus
 
-// For BlueTooth connectivity.
-#include "btwrapper.h"
+// For local connectivity.
 #include "connection.h"
+#include "espnowwrapper.h"
+// Game stuff.
+#include "player.h"
+#include "graphics.h"
+
+extern pax_buf_t buf;
+extern xQueueHandle buttonQueue;
+extern Player *localPlayer;
+extern Player *companion;
 
 // Broadcast info obout ourselves.
 void broadcastInfo();

@@ -79,6 +79,18 @@ void espnow_broadcast(const char *topic, const char *data) {
     broadcaster->send(topic, data);
 }
 
+void espnow_broadcast_num(const char *topic, long number) {
+    char temp[64];
+    snprintf(temp, 64, "%ld", number);
+    broadcaster->send(topic, temp);
+}
+
+void espnow_broadcast_float(const char *topic, float number) {
+    char temp[64];
+    snprintf(temp, 64, "%f", number);
+    broadcaster->send(topic, temp);
+}
+
 void espnowRecvCallback(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
     if (data_len < sizeof(magic) || memcmp(data, magic, sizeof(magic))) {
         // This is not data for me.
@@ -94,7 +106,11 @@ void espnowRecvCallback(const uint8_t *mac_addr, const uint8_t *data, int data_l
         ESP_LOGI(TAG, "Creating connection.");
         // Make a new one.
         char *id = (char *) malloc(18);
-        snprintf(id, 18, "%016llx", mac_pak);
+        snprintf(
+            id, 18, "%02x:%02x:%02x:%02x:%02x:%02x",
+            mac_addr[0], mac_addr[1], mac_addr[2],
+            mac_addr[3], mac_addr[4], mac_addr[5]
+        );
         conn = new Connection(espnowSendCallback);
         conn->dataCallbacks.push_back(mainDataCallback);
         conn->statusCallbacks.push_back(mainStatusCallback);

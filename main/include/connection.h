@@ -1,4 +1,6 @@
 
+#pragma once
+
 #include <stdlib.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -11,7 +13,9 @@
 
 #include <vector>
 
-#pragma once
+class Connection;
+
+#include "player.h"
 
 // Timeout after last message to consider connection closed.
 #define Connection_TIMEOUT       5000
@@ -87,6 +91,8 @@ class Connection {
 		// Callback to send data to peer.
 		typedef void(*SendCallback)(Connection *from, const char *data);
 		
+		// Player associated with this connection.
+		Player *player;
 		// Current connection status.
 		Status status;
 		// List of data callbacks for when a message arrives.
