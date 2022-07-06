@@ -71,7 +71,7 @@ extern "C" void app_main() {
         
         // Await any button press or the next broadcast time.
         rp2040_input_message_t message;
-        xQueueReceive(buttonQueue, &message, pdMS_TO_TICKS(nextInfoBroadcast - now));
+        xQueueReceive(buttonQueue, &message, 1);
         
         // Is the home button currently pressed?
         if (message.input == RP2040_INPUT_BUTTON_HOME && message.state) {

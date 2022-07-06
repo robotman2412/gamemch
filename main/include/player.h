@@ -2,6 +2,7 @@
 #pragma once
 
 class Player;
+class Blob;
 
 typedef enum {
     // Not currently interacting.
@@ -13,6 +14,8 @@ typedef enum {
 } InteractStatus;
 
 extern const char *interactStatusNames[3];
+extern const char *fieldNames[22];
+#define NUM_FIELDS 22
 
 #include "connection.h"
 

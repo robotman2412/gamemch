@@ -7,6 +7,31 @@
 
 
 
+const char *fieldNames[22] = {
+    "Alexander Field",
+    "Babbage Field",
+    "Boole Field",
+    "Clarke Field",
+    "Engelbart Field",
+    "Flowers Field",
+    "Goldwasser Field",
+    "Hamilton Field",
+    "Hopper Field",
+    "Lamarr Field",
+    "Liskov Field",
+    "Lovelace Field",
+    "Manning Field",
+    "Olsen Field",
+    "Rhodes Field",
+    "Snowden Field",
+    "Titulaer Field",
+    "Torvalds Field",
+    "Turing Field",
+    "Wilson Field",
+    "Wozniak Field",
+    "Zuse Field",
+};
+
 const char *interactStatusNames[3] = {
     "idle",
     "awaiting",
