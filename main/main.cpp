@@ -49,6 +49,7 @@ extern "C" void app_main() {
     pax_buf_init(&buf, NULL, 320, 240, PAX_BUF_16_565RGB);
     // Init other graphics things.
     graphics_init();
+    pax_enable_multicore(1);
     // Init NVS.
     nvs_flash_init();
     // Init (but not connect to) WiFi.
@@ -77,30 +78,43 @@ extern "C" void app_main() {
         
         // Await any button press or the next broadcast time.
         rp2040_input_message_t message;
-        xQueueReceive(buttonQueue, &message, 1);
-        
-        // Is the home button currently pressed?
-        if (message.input == RP2040_INPUT_BUTTON_HOME && message.state) {
-            // If home is pressed, exit to launcher.
-            exit_to_launcher();
-        } else if (message.input == RP2040_INPUT_JOYSTICK_UP && message.state) {
-            // Increment our score.
-            localPlayer->addScore(1);
-        } else if (message.input == RP2040_INPUT_JOYSTICK_DOWN && message.state) {
-            // Decrement our score.
-            localPlayer->addScore(-1);
-        } else if (message.input == RP2040_INPUT_BUTTON_SELECT && message.state && !companion) {
-            // Go to interaction menu.
-            if (nearby == 1) {
-                // Just ask this one directly.
-                askCompanion(firstNearby);
-                currentScreen = Screen::COMP_AWAIT;
-            } else if (nearby) {
-                // Go to the selection menu.
-                currentScreen = Screen::COMP_SELECT;
+        if (xQueueReceive(buttonQueue, &message, 1)) {
+            
+            if (message.input == RP2040_INPUT_BUTTON_HOME && message.state) {
+                // If home is pressed, exit to launcher.
+                exit_to_launcher();
+                
+            } else if (message.input == RP2040_INPUT_JOYSTICK_UP && message.state) {
+                // Debug: Increment our score.
+                localPlayer->addScore(1);
+                
+            } else if (message.input == RP2040_INPUT_JOYSTICK_DOWN && message.state) {
+                // Debug: Decrement our score.
+                localPlayer->addScore(-1);
+                
+            } else if (message.input == RP2040_INPUT_BUTTON_SELECT && message.state && !companion) {
+                // Go to interaction menu.
+                if (nearby == 1) {
+                    // Just ask this one directly.
+                    askCompanion(firstNearby);
+                    currentScreen = Screen::COMP_AWAIT;
+                } else if (nearby) {
+                    // Go to the selection menu.
+                    currentScreen = Screen::COMP_SELECT;
+                }
+                
+            } else if (message.input == RP2040_INPUT_BUTTON_BACK && message.state && companion) {
+                // Manually leave.
+                companion->connection->send("info", "leave");
+                companion = NULL;
+                
+            } else if (message.input == RP2040_INPUT_JOYSTICK_PRESS && message.state) {
+                // Debug: Change blob with maximum random.
+                localPlayer->blob->applyAttributes();
+                if (companion) {
+                    localPlayer->blob->send(companion->connection);
+                }
             }
-        } else if (message.input == RP2040_INPUT_BUTTON_BACK && message.state && companion) {
-            companion->connection->send("info", "leave");
         }
     }
 }
@@ -110,14 +124,19 @@ extern "C" void app_main() {
 // Broadcast info obout ourselves.
 void broadcastInfo() {
     // Advertise our presence by broadcasting our nickname and score.
-    espnow_broadcast("nick",  localPlayer->getNick());
+    espnow_broadcast("nick",      localPlayer->getNick());
     espnow_broadcast_num("score", localPlayer->getScore());
 }
 
 // Ask a connection as companion.
 void askCompanion(Connection *to) {
+    // Set the candidate companion.
     setCompanion(to, false);
-    to->send("info", "request_companion");
+    // Send our name to this player in case they didn't get the broadcast.
+    to->send   ("nick",  localPlayer->getNick());
+    to->sendNum("score", localPlayer->getScore());
+    // And request it to them.
+    to->send   ("info",  "request_companion");
 }
 
 
@@ -141,8 +160,10 @@ void mainDataCallback(Connection *from, const char *type, const char *data) {
     
     if (!strcmp(type, "info")) {
         if (!strcmp(data, "request_companion")) {
-            // We'll just agree to all companion requests.
-            from->send("info", "request_companion");
+            if (!companion) {
+                // We'll just agree to all companion requests for now.
+                from->send("info", "request_companion");
+            }
             setCompanion(from, true);
             
         } else if (!strcmp(data, "leave")) {
@@ -155,4 +176,9 @@ void mainDataCallback(Connection *from, const char *type, const char *data) {
 // Status event handling.
 void mainStatusCallback(Connection *from) {
     ESP_LOGI(TAG, "Connection status for %s changed to %s", from->peer, from->statusToName());
+    
+    if (from->player == companion) {
+        companion->connection->send("info", "leave");
+        companion = NULL;
+    }
 }

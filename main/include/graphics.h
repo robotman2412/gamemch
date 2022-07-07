@@ -96,6 +96,8 @@ class AttributeSet {
         // The weight of this set in mutations.
         float mutationWeight;
         
+        // Copy constructor.
+        AttributeSet(const AttributeSet &other);
         // Empty nameless set.
         AttributeSet();
         // Empty named set.

@@ -12,6 +12,8 @@ AttributeSet slime;
 std::vector<AttributeSet> attributeSets;
 
 static void initAttributeSets() {
+    attributeSets = std::vector<AttributeSet>();
+    
     // Defaults:
         // Square or round body.
         defaultSet.add(Attribute::BODY_SHAPE, Attribute::SET, Shape::SQUARE, 1, 1);
@@ -45,9 +47,9 @@ static void initAttributeSets() {
     darkSide.initialWeight  = 0.1;
     darkSide.mutationWeight = 0.1;
         // Dark body.
-        darkSide.add(Attribute::BODY_BRI,  Attribute::SET, 50, 16, 5);
+        darkSide.add(Attribute::BODY_BRI,  Attribute::SET, 70, 7, 5);
         // Slightly brigher outline.
-        darkSide.add(Attribute::ALT_BRI,   Attribute::SET, 70, 16, 5);
+        darkSide.add(Attribute::ALT_BRI,   Attribute::SET, 90, 7, 5);
         // Less eye saturation.
         darkSide.add(Attribute::EYE_SAT,   Attribute::SET, 130, 20, 3);
         // More eye brightness.
@@ -58,6 +60,13 @@ static void initAttributeSets() {
     
     // Slime.
     slime = AttributeSet("Slime");
+    darkSide.initialWeight  = 0.1;
+    darkSide.mutationWeight = 0.1;
+        // Tends to be green.
+        slime.add(Attribute::BODY_HUE, Attribute::SET, 96, 5, 10);
+        // Adds cutout eyes.
+        slime.add(Attribute::EYE_TYPE, Attribute::SET, EyeType::CUTOUT, 1, 5);
+    attributeSets.push_back(slime);
 }
 
 void graphics_init() {
@@ -66,6 +75,9 @@ void graphics_init() {
 }
 
 void graphics_task() {
+    // Copy to prevent race conditions.
+    Player *companion = ::companion;
+    
     static bool hadCompanion = false;
     static bool wasLoaded = false;
     pax_background(&buf, 0);
@@ -87,7 +99,7 @@ void graphics_task() {
     }
     
     // Draw the AVATAARRRRR.
-    if (companion) {
+    if (companion && companionAgrees) {
         if (!hadCompanion) {
             localPlayer->blob->pos.animateTo(buf.width/3, buf.height/2, 35, 1000);
             companion->blob->pos = Blob::Pos(buf.width*2/3, buf.height/2, 0);
@@ -110,6 +122,14 @@ void graphics_task() {
 }
 
 
+
+// Copy constructor.
+AttributeSet::AttributeSet(const AttributeSet &other) {
+    attributes     = other.attributes;
+    name           = strdup(other.name);
+    initialWeight  = other.initialWeight;
+    mutationWeight = other.mutationWeight;
+}
 
 Attribute::Attribute() {}
 
@@ -167,7 +187,8 @@ Blob::Blob() {
     
     // Attributes.
     attributes.push_back(defaultSet);
-    // attributes.push_back(darkSide);
+    attributes.push_back(darkSide);
+    attributes.push_back(slime);
 }
 
 // Draws an n-gon based on a circle.
