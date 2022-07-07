@@ -14,6 +14,7 @@
 #include <vector>
 
 class Connection;
+extern std::vector<Connection *> connections;
 
 #include "player.h"
 
@@ -124,6 +125,10 @@ class Connection {
 		
 		// Send data to the peer.
 		void send(const char *topic, const char *cstr);
+		// Send integer to the peer.
+		void sendNum(const char *topic, long data);
+		// Send float data to the peer.
+		void sendFloat(const char *topic, float data);
 		
 		// Sets the status and notifies all listeners.
 		void setStatus(Status newStatus);

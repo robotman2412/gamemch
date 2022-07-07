@@ -46,9 +46,9 @@ Connection::Connection(SendCallback callback) {
 	recvPhase    = Connection::IDLE;
 	sendCallback = callback;
 	retransmit   = 3;
+	player       = new Player();
 	dataCallbacks.push_back(playerDataCallback);
 	statusCallbacks.push_back(playerStatusCallback);
-	player       = new Player();
 	// Add this to the connection list.
 	connections.push_back(this);
 }
@@ -235,6 +235,20 @@ void Connection::send(const char *topic, const char *cstr) {
 	// Send it along.
 	if (sendCallback) sendCallback(this, buf);
 	delete buf;
+}
+
+// Send integer to the peer.
+void Connection::sendNum(const char *topic, long data) {
+    char temp[Connection_BUF_LEN];
+    snprintf(temp, Connection_BUF_LEN, "%ld", data);
+	send(topic, temp);
+}
+
+// Send float data to the peer.
+void Connection::sendFloat(const char *topic, float data) {
+    char temp[Connection_BUF_LEN];
+    snprintf(temp, Connection_BUF_LEN, "%f", data);
+	send(topic, temp);
 }
 
 // Sets the status and notifies all listeners.

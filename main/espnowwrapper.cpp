@@ -80,14 +80,14 @@ void espnow_broadcast(const char *topic, const char *data) {
 }
 
 void espnow_broadcast_num(const char *topic, long number) {
-    char temp[64];
-    snprintf(temp, 64, "%ld", number);
+    char temp[Connection_BUF_LEN];
+    snprintf(temp, Connection_BUF_LEN, "%ld", number);
     broadcaster->send(topic, temp);
 }
 
 void espnow_broadcast_float(const char *topic, float number) {
-    char temp[64];
-    snprintf(temp, 64, "%f", number);
+    char temp[Connection_BUF_LEN];
+    snprintf(temp, Connection_BUF_LEN, "%f", number);
     broadcaster->send(topic, temp);
 }
 

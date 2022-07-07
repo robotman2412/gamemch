@@ -44,6 +44,8 @@ extern "C" void app_main() {
     
     // Init graphics for the screen.
     pax_buf_init(&buf, NULL, 320, 240, PAX_BUF_16_565RGB);
+    // Init other graphics things.
+    graphics_init();
     // Init NVS.
     nvs_flash_init();
     // Init (but not connect to) WiFi.
@@ -59,6 +61,16 @@ extern "C" void app_main() {
     localPlayer = loadFromNvs();
     
     while (1) {
+        // Unset thel companion.
+        for (int i = 0; i < connections.size(); i++) {
+            if (connections[i]->status == Connection::OPEN) {
+                if (!companion) {
+                    connections[i]->send("info", "blob");
+                }
+                companion = connections[i]->player;
+            }
+        }
+        
         graphics_task();
         
         now = esp_timer_get_time() / 1000;

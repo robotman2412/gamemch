@@ -68,6 +68,10 @@ Player *loadFromNvs() {
     // Because this is you as a player, broadcast all updates.
     player->doBroadcast = true;
     
+    // Set the BLOB.
+    player->blob = new Blob();
+    player->blob->applyAttributes();
+    
     // Clean up.
     delete nick;
     return player;
@@ -86,6 +90,7 @@ Player::Player() {
     nickname    = strdup("Player");
     status      = InteractStatus::IDLE;
     doBroadcast = false;
+    blob        = new Blob();
 }
 
 // Make a new player.
@@ -99,6 +104,7 @@ Player::Player(const char *newNickname) {
 
 Player::~Player() {
     free(nickname);
+    delete blob;
 }
 
 
@@ -114,6 +120,12 @@ void Player::dataCallback(Connection *from, const char *type, const char *data) 
     } else if (!strcmp(type, "nick")) {
         // Literally any nickname is valid.
         setNick(data);
+    } else if (!strncmp(type, "blob_", 5)) {
+        // Data for the blob.
+        blob->receive(from, type, data);
+    } else if (!strcmp(type, "info") && !strcmp(data, "blob")) {
+        // Send blob.
+        localPlayer->blob->send(from);
     }
 }
 

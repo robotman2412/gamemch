@@ -18,6 +18,7 @@ extern const char *fieldNames[22];
 #define NUM_FIELDS 22
 
 #include "connection.h"
+#include "graphics.h"
 
 class Player {
     private:
@@ -29,6 +30,8 @@ class Player {
     public:
         // Whether to broadcast status updates.
         bool doBroadcast;
+        // The blob that belongs to this player.
+        Blob *blob;
         
         // Make an empty player.
         Player();
