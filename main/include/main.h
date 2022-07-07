@@ -41,6 +41,17 @@ void exit_to_launcher();
 }
 #endif //__cplusplus
 
+typedef enum {
+    // Home screen: not doing much.
+    HOME,
+    // Companion select screen.
+    COMP_SELECT,
+    // We have asked the companion, await confirmation.
+    COMP_AWAIT,
+} Screen;
+
+extern Screen currentScreen;
+
 // For local connectivity.
 #include "connection.h"
 #include "espnowwrapper.h"
@@ -52,9 +63,14 @@ extern pax_buf_t buf;
 extern xQueueHandle buttonQueue;
 extern Player *localPlayer;
 extern Player *companion;
+extern bool companionAgrees;
 
 // Broadcast info obout ourselves.
 void broadcastInfo();
+// Ask a connection as companion.
+void askCompanion(Connection *to);
+// Sets the companion.
+void setCompanion(Connection *to, bool agrees);
 
 // Data event handling.
 void mainDataCallback(Connection *from, const char *type, const char *data);

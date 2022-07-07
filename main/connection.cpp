@@ -7,6 +7,7 @@
 
 static TaskHandle_t handle;
 std::vector<Connection *> connections;
+Connection *firstNearby;
 
 static const char *TAG = "connection";
 int nearby = 0;
@@ -47,6 +48,7 @@ Connection::Connection(SendCallback callback) {
 	sendCallback = callback;
 	retransmit   = 3;
 	player       = new Player();
+	player->connection = this;
 	dataCallbacks.push_back(playerDataCallback);
 	statusCallbacks.push_back(playerStatusCallback);
 	// Add this to the connection list.
@@ -286,6 +288,7 @@ static void connectionTask(void *ignored) {
 		uint64_t now = esp_timer_get_time() / 1000;
 		
 		int new_nearby = 0;
+		Connection *newFirstNearby = NULL;
 		// Check connections for DEATH.
 		for (size_t i = 0; i < connections.size(); i++) {
 			Connection *conn = connections[i];
@@ -300,9 +303,11 @@ static void connectionTask(void *ignored) {
 				}
 			} else if (conn->status == Connection::OPEN) {
 				new_nearby ++;
+				if (!newFirstNearby) newFirstNearby = conn;
 			}
 		}
 		nearby = new_nearby;
+		firstNearby = newFirstNearby;
 	}
 }
 

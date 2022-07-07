@@ -8,6 +8,7 @@
 static const char *TAG = "graphics";
 AttributeSet defaultSet;
 AttributeSet darkSide;
+AttributeSet slime;
 std::vector<AttributeSet> attributeSets;
 
 static void initAttributeSets() {
@@ -15,8 +16,9 @@ static void initAttributeSets() {
         // Square or round body.
         defaultSet.add(Attribute::BODY_SHAPE, Attribute::SET, Shape::SQUARE, 1, 1);
         defaultSet.add(Attribute::BODY_SHAPE, Attribute::SET, Shape::CIRCLE, 1, 1);
-        // Two eyes.
+        // Two traditional eyes.
         defaultSet.add(Attribute::EYE_COUNT,  Attribute::SET, 2, 1, 1);
+        defaultSet.add(Attribute::EYE_TYPE,   Attribute::SET, EyeType::TRADITIONAL, 1, 1);
         
         // Basically any eye hue.
         defaultSet.add(Attribute::EYE_HUE,    Attribute::SET, 1, 1000, 1);
@@ -40,15 +42,22 @@ static void initAttributeSets() {
     
     // Dark side.
     darkSide = AttributeSet("Dark Side");
+    darkSide.initialWeight  = 0.1;
+    darkSide.mutationWeight = 0.1;
         // Dark body.
         darkSide.add(Attribute::BODY_BRI,  Attribute::SET, 50, 16, 5);
         // Slightly brigher outline.
         darkSide.add(Attribute::ALT_BRI,   Attribute::SET, 70, 16, 5);
         // Less eye saturation.
-        defaultSet.add(Attribute::EYE_SAT, Attribute::SET, 130, 20, 3);
+        darkSide.add(Attribute::EYE_SAT,   Attribute::SET, 130, 20, 3);
         // More eye brightness.
-        defaultSet.add(Attribute::EYE_BRI, Attribute::SET, 255, 50, 10);
+        darkSide.add(Attribute::EYE_BRI,   Attribute::SET, 255, 50, 10);
+        // Chance of dark eyes.
+        darkSide.add(Attribute::EYE_TYPE,  Attribute::SET, EyeType::DARK, 1, 2);
     attributeSets.push_back(darkSide);
+    
+    // Slime.
+    slime = AttributeSet("Slime");
 }
 
 void graphics_init() {
@@ -57,10 +66,16 @@ void graphics_init() {
 }
 
 void graphics_task() {
+    static bool hadCompanion = false;
+    static bool wasLoaded = false;
     pax_background(&buf, 0);
     
     // Show number of nearby people.
-    if (!nearby) {
+    if (companion && !companionAgrees) {
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Cancel");
+    } else if (companion) {
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Leave");
+    } else if (!nearby) {
         pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Nobody nearby");
     } else if (nearby == 1) {
         pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅴 1 person nearby");
@@ -73,10 +88,22 @@ void graphics_task() {
     
     // Draw the AVATAARRRRR.
     if (companion) {
-        localPlayer->blob->draw(320/3, 240/2, 50);
-        companion->blob->draw(320*2/3, 240/2, 50);
+        if (!hadCompanion) {
+            localPlayer->blob->pos.animateTo(buf.width/3, buf.height/2, 35, 1000);
+            companion->blob->pos = Blob::Pos(buf.width*2/3, buf.height/2, 0);
+            companion->blob->pos.animateTo(buf.width*2/3, buf.height/2, 35, 1000);
+        }
+        
+        localPlayer->blob->draw();
+        companion->blob->draw();
+        hadCompanion = true;
     } else {
-        localPlayer->blob->draw(320/2, 240/2, 50);
+        if (hadCompanion) {
+            localPlayer->blob->pos.animateTo(buf.width/2, buf.height/2, 50, 1000);
+        }
+        localPlayer->blob->draw();
+        hadCompanion = false;
+        wasLoaded = false;
     }
     
     disp_flush();
@@ -133,7 +160,10 @@ Blob::Blob() {
     eyes.push_back(Pos(-0.4, -0.5));
     eyes.push_back(Pos( 0.4, -0.5));
     mouth     = Pos(0.0, 0.4);
-    mouthBias = 0;
+    mouthBias = Pos();
+    lookingAt = Pos();
+    pos       = Pos(buf.width/2.0, buf.height/2.0, 50);
+    blinkTime = 0;
     
     // Attributes.
     attributes.push_back(defaultSet);
@@ -187,33 +217,28 @@ static void draw_ngon(size_t num, pax_col_t bodyColor, pax_col_t altColor, float
 }
 
 // Draw the blob.
-void Blob::draw(float x, float y, float scale) {
+void Blob::draw() {
     float edge = 0.2;
     static int64_t nextRandom = 0;
     int64_t now = esp_timer_get_time() / 1000;
     if (nextRandom <= now) {
         nextRandom      = now + 3000;
         float a         = esp_random() / (float) INT32_MAX * M_PI;
-        lookingAt.x0    = lookingAt.x;
-        lookingAt.y0    = lookingAt.y;
-        lookingAt.x1    = sinf(a);
-        lookingAt.y1    = cosf(a);
-        lookingAt.start = now;
-        lookingAt.end   = now + 500;
+        lookingAt.animateTo(cosf(a), sinf(a), 500);
         if (nearby) {
-            targetBias  = esp_random() / (float) UINT32_MAX;
+            mouthBias.animateTo(esp_random() / (float) UINT32_MAX, 0.0, 1000);
         } else {
-            targetBias  = (int) esp_random() / (float) INT32_MAX;
+            mouthBias.animateTo((int) esp_random() / (float) INT32_MAX, 0.0, 1000);
         }
     }
     if (now >= blinkTime + 300) {
-        blinkTime = now + 4000 + esp_random() * 3000UL / UINT32_MAX;
+        blinkTime = now + 4000 + (esp_random() / (float) UINT32_MAX * 3000.0);
     }
     
     // Apply position and scale.
     pax_push_2d(&buf);
-    pax_apply_2d(&buf, matrix_2d_translate(x, y));
-    pax_apply_2d(&buf, matrix_2d_scale(scale, scale));
+    pax_apply_2d(&buf, matrix_2d_translate(pos.x, pos.y));
+    pax_apply_2d(&buf, matrix_2d_scale(pos.scale, pos.scale));
     
     
     switch (body) {
@@ -251,13 +276,14 @@ void Blob::draw(float x, float y, float scale) {
     }
     
     // Animate misc.
-    mouthBias += (targetBias - mouthBias) * 0.3;
+    mouthBias.timeAnimate(now);
     lookingAt.timeAnimate(now);
+    pos.timeAnimate(now);
     
     
     // Position of mouth.
     float mouthScaleY = 0.10;
-    float mouthScaleX = mouthScaleY * (1 + 0.5 * fabsf(mouthBias));
+    float mouthScaleX = mouthScaleY * (1 + 0.5 * fabsf(mouthBias.x));
     pax_apply_2d(&buf, matrix_2d_translate(mouth.x, mouth.y));
     pax_apply_2d(&buf, matrix_2d_scale(mouthScaleX, mouthScaleY));
     
@@ -267,7 +293,7 @@ void Blob::draw(float x, float y, float scale) {
     // Nudge the edges.
     for (int i = 0; i < 16; i++) {
         float effect = (1 - fabsf(mouth[i].y));
-        mouth[i].y -= effect * mouthBias;
+        mouth[i].y -= effect * mouthBias.x;
     }
     // Draw it like normal.
     for (int i = 1; i < 15; i++) {
@@ -311,6 +337,9 @@ void Blob::applyAttributes() {
     sat = calculateAttribute(Attribute::EYE_SAT, 0, 255);
     bri = calculateAttribute(Attribute::EYE_BRI, 0, 255);
     eyeColor = pax_col_hsv(hue, sat, bri);
+    
+    // Eye type.
+    eyeType = (EyeType) calculateAttribute(Attribute::EYE_TYPE, EyeType::TRADITIONAL, EyeType::CUTOUT);
 }
 
 // Adds a curve to the probabilities list.
@@ -396,15 +425,19 @@ void Blob::send(Connection *to) {
     to->sendNum("blob_alt_col",  altColor);
     to->sendNum("blob_eye_col",  eyeColor);
     // Send eyes.
+    to->sendNum("blob_eye_type", (int) eyeType);
     to->sendNum("blob_eye_count", eyes.size());
     for (int i = 0; i < eyes.size(); i++) {
         snprintf(temp, 32, "blob_eye/%d", i);
         eyes[i].send(to, temp);
     }
+    // Send looking direction.
+    lookingAt.send(to, "blob_looking");
     // Send body type.
     to->sendNum("blob_body", (int) body);
     // Send mouth.
     mouth.send(to, "blob_mouth");
+    mouthBias.send(to, "blob_mouth_bias");
     
     delete temp;
 }
@@ -418,8 +451,16 @@ void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) 
         bodyColor = atoi(tmpData);
     } else if (!strcmp(tmpTopic, "blob_alt_col")) {
         altColor = atoi(tmpData);
+    } else if (!strcmp(tmpTopic, "blob_looking")) {
+        lookingAt = Pos(tmpData);
+    } else if (!strcmp(tmpTopic, "blob_mouth")) {
+        mouth = Pos(tmpData);
+    } else if (!strcmp(tmpTopic, "blob_mouth_bias")) {
+        mouthBias = Pos(tmpData);
     } else if (!strcmp(tmpTopic, "blob_eye_col")) {
         eyeColor = atoi(tmpData);
+    } else if (!strcmp(tmpTopic, "blob_eye_type")) {
+        eyeType = (EyeType) atoi(tmpData);
     } else if (!strcmp(tmpTopic, "blob_eye_count")) {
         // eyes.clear();
     }
@@ -428,14 +469,22 @@ void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) 
 
 // Origin position.
 Blob::Pos::Pos() {
-    x = y = 0;
+    x=x0=x1=y=y0=y1=0;
+    scale=s0=s1=1;
 }
 
 // Position.
 Blob::Pos::Pos(float sx, float sy) {
-    x  = sx; y  = sy;
-    x0 = sx; y0 = sy;
-    x1 = sx; y1 = sy;
+    x  = sx; y  = sy; scale = 1;
+    x0 = sx; y0 = sy; s0 = 1;
+    x1 = sx; y1 = sy; s1 = 1;
+}
+
+// Position.
+Blob::Pos::Pos(float sx, float sy, float ss) {
+    x  = sx; y  = sy; scale = ss;
+    x0 = sx; y0 = sy; s0 = ss;
+    x1 = sx; y1 = sy; s1 = ss;
 }
 
 // Position from data.
@@ -457,8 +506,9 @@ Blob::Pos::Pos(const char *tmpData) {
 void Blob::Pos::coeffAnimate(float newCoeff) {
     // -2x³+3x²
     float coeff = -2*newCoeff*newCoeff*newCoeff + 3*newCoeff*newCoeff;
-    x = x0 + (x1 - x0) * coeff;
-    y = y0 + (y1 - y0) * coeff;
+    x     = x0 + (x1 - x0) * coeff;
+    y     = y0 + (y1 - y0) * coeff;
+    scale = s0 + (s1 - s0) * coeff;
 }
 
 // Animate using time.
@@ -474,8 +524,22 @@ void Blob::Pos::timeAnimate(int64_t now) {
 void Blob::Pos::animateTo(float newX, float newY, int64_t duration) {
     x0 = x;
     y0 = y;
+    s0 = scale;
     x1 = newX;
     y1 = newY;
+    s1 = scale;
+    start = esp_timer_get_time() / 1000;
+    end   = start + duration;
+}
+
+// Set animation's target.
+void Blob::Pos::animateTo(float newX, float newY, float newScale, int64_t duration) {
+    x0 = x;
+    y0 = y;
+    s0 = scale;
+    x1 = newX;
+    y1 = newY;
+    s1 = newScale;
     start = esp_timer_get_time() / 1000;
     end   = start + duration;
 }
@@ -483,9 +547,17 @@ void Blob::Pos::animateTo(float newX, float newY, int64_t duration) {
 
 // Send data.
 void Blob::Pos::send(Connection *to, const char *topic) {
-    char temp[32];
+    // Allocate some memory.
+    char *temp       = new char[Connection_BUF_LEN];
+    // Adjust animation times.
+    int64_t now      = esp_timer_get_time() / 1000;
+    int64_t startAlt = start - now;
+    int64_t endAlt   = end   - now;
+    // Format and send it!
     snprintf(temp, 32, "%f,%f", x1, y1);
     to->send(topic, temp);
+    
+    delete temp;
 }
 
 
@@ -528,7 +600,7 @@ void Blob::Pos::drawAsEye(Blob *blob) {
             break;
         case(EyeType::CUTOUT):
             // Eye is like a cutout.
-            pax_draw_circle(&buf, blob->eyeColor, lookX*0.3, lookY*0.3, 1);
+            pax_draw_circle(&buf, blob->altColor, lookX*0.3, lookY*0.3, 1);
             break;
     }
     

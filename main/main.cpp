@@ -4,11 +4,14 @@
 #include "main.h"
 #include "graphics.h"
 #include "esp_timer.h"
+#include "string.h"
 
 pax_buf_t buf;
 xQueueHandle buttonQueue;
 Player *localPlayer;
 Player *companion;
+bool companionAgrees;
+Screen currentScreen;
 
 static const char *TAG = "main";
 
@@ -59,18 +62,9 @@ extern "C" void app_main() {
     
     // Load local player.
     localPlayer = loadFromNvs();
+    currentScreen = Screen::HOME;
     
     while (1) {
-        // Unset thel companion.
-        for (int i = 0; i < connections.size(); i++) {
-            if (connections[i]->status == Connection::OPEN) {
-                if (!companion) {
-                    connections[i]->send("info", "blob");
-                }
-                companion = connections[i]->player;
-            }
-        }
-        
         graphics_task();
         
         now = esp_timer_get_time() / 1000;
@@ -95,6 +89,18 @@ extern "C" void app_main() {
         } else if (message.input == RP2040_INPUT_JOYSTICK_DOWN && message.state) {
             // Decrement our score.
             localPlayer->addScore(-1);
+        } else if (message.input == RP2040_INPUT_BUTTON_SELECT && message.state && !companion) {
+            // Go to interaction menu.
+            if (nearby == 1) {
+                // Just ask this one directly.
+                askCompanion(firstNearby);
+                currentScreen = Screen::COMP_AWAIT;
+            } else if (nearby) {
+                // Go to the selection menu.
+                currentScreen = Screen::COMP_SELECT;
+            }
+        } else if (message.input == RP2040_INPUT_BUTTON_BACK && message.state && companion) {
+            companion->connection->send("info", "leave");
         }
     }
 }
@@ -108,11 +114,42 @@ void broadcastInfo() {
     espnow_broadcast_num("score", localPlayer->getScore());
 }
 
+// Ask a connection as companion.
+void askCompanion(Connection *to) {
+    setCompanion(to, false);
+    to->send("info", "request_companion");
+}
+
+
+// Sets the companion.
+void setCompanion(Connection *to, bool agrees) {
+    companion = to->player;
+    companionAgrees = agrees;
+    if (agrees) {
+        // Request their blob.
+        to->send("info", "blob");
+        // And set screen to home.
+        currentScreen = Screen::HOME;
+    }
+}
+
 
 
 // Data event handling.
 void mainDataCallback(Connection *from, const char *type, const char *data) {
     ESP_LOGI(TAG, "Message from %s: %s: %s", from->peer, type, data);
+    
+    if (!strcmp(type, "info")) {
+        if (!strcmp(data, "request_companion")) {
+            // We'll just agree to all companion requests.
+            from->send("info", "request_companion");
+            setCompanion(from, true);
+            
+        } else if (!strcmp(data, "leave")) {
+            // Our companion leaves.
+            companion = NULL;
+        }
+    }
 }
 
 // Status event handling.

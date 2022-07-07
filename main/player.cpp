@@ -91,6 +91,7 @@ Player::Player() {
     status      = InteractStatus::IDLE;
     doBroadcast = false;
     blob        = new Blob();
+    connection  = NULL;
 }
 
 // Make a new player.
@@ -100,11 +101,13 @@ Player::Player(const char *newNickname) {
     nickname    = strdup(newNickname);
     status      = InteractStatus::IDLE;
     doBroadcast = false;
+    connection  = NULL;
 }
 
 Player::~Player() {
     free(nickname);
     delete blob;
+    // It is intentional not to delete the connection.
 }
 
 

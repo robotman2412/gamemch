@@ -32,6 +32,8 @@ class Player {
         bool doBroadcast;
         // The blob that belongs to this player.
         Blob *blob;
+        // The (optional) connection for this player.
+        Connection *connection;
         
         // Make an empty player.
         Player();

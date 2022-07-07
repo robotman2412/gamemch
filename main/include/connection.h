@@ -15,6 +15,7 @@
 
 class Connection;
 extern std::vector<Connection *> connections;
+extern Connection *firstNearby;
 
 #include "player.h"
 

@@ -12,7 +12,7 @@ class Blob;
 extern std::vector<AttributeSet> attributeSets;
 
 typedef enum {
-    TRIANGLE,
+    UNDEFINED,
     SQUARE,
     PENTAGON,
     HEXAGON,
@@ -91,6 +91,10 @@ class AttributeSet {
     public:
         // All attributes affected.
         std::vector<Attribute> attributes;
+        // The weight of this set in first time blob.
+        float initialWeight;
+        // The weight of this set in mutations.
+        float mutationWeight;
         
         // Empty nameless set.
         AttributeSet();
@@ -115,10 +119,12 @@ class Blob {
             public:
                 // Current position.
                 float x, y;
+                // Current scale.
+                float scale;
                 // Animating from.
-                float x0, y0;
+                float x0, y0, s0;
                 // Animating to.
-                float x1, y1;
+                float x1, y1, s1;
                 // Animation start time.
                 uint64_t start;
                 // Animation end time.
@@ -128,6 +134,8 @@ class Blob {
                 Pos();
                 // Position.
                 Pos(float x, float y);
+                // Position.
+                Pos(float x, float y, float scale);
                 // Position from data.
                 Pos(const char *data);
                 
@@ -137,6 +145,8 @@ class Blob {
                 void timeAnimate(int64_t now);
                 // Set animation's target.
                 void animateTo(float newX, float newY, int64_t duration);
+                // Set animation's target.
+                void animateTo(float newX, float newY, float newScale, int64_t duration);
                 
                 // Send data.
                 void send(Connection *to, const char *topic);
@@ -157,8 +167,7 @@ class Blob {
         // Position of the mouth.
         Pos       mouth;
         // Shape of the mouth, x=-1 to x=1, positive is happy.
-        // Pos       mouthBias;
-        float mouthBias, targetBias;
+        Pos       mouthBias;
         
         // Color of the body.
         pax_col_t bodyColor;
@@ -173,6 +182,8 @@ class Blob {
         EyeType   eyeType;
         // Looking at, never greater than 1 in magnitude.
         Pos       lookingAt;
+        // On-screen position.
+        Pos       pos;
         
         // Time at which to blink.
         int64_t  blinkTime;
@@ -182,7 +193,7 @@ class Blob {
         Blob();
         
         // Draw the blob.
-        void draw(float x, float y, float scale);
+        void draw();
         // Gets X counterpart for a given Y on the edge of the blob.
         float getEdgeX(float y, float angle);
         // Apply the blob's attributes.
