@@ -6,15 +6,31 @@
 
 
 static const char *TAG = "graphics";
-AttributeSet defaultSet;
-AttributeSet darkSide;
-AttributeSet slime;
+
+AttributeSet defaultSet ("", Rarity::UNOBTAINABLE);
+
+/* ==== eyes ==== */
+AttributeSet eyeBlue    ("Blue Eyes",   Rarity::UNCOMMON);
+AttributeSet eyeGreen   ("Green Eyes",  Rarity::COMMON);
+AttributeSet eyeBrown   ("Brown Eyes",  Rarity::COMMON);
+AttributeSet eyePurple  ("Purple Eyes", Rarity::VERY_RARE);
+AttributeSet eyeOrange  ("Orange Eyes", Rarity::VERY_RARE);
+AttributeSet eyeRed     ("Red Eyes",    Rarity::LEGENDARY);
+AttributeSet eyeBlack   ("Black Eyes",  Rarity::LEGENDARY);
+
+/* ==== body ==== */
+AttributeSet darkSide   ("Dark Side",   Rarity::RARE);
+AttributeSet slime      ("Slime",       Rarity::RARE);
+
 std::vector<AttributeSet> attributeSets;
+int debugAttrIndex = 0;
+static const size_t temp_len = 1024;
+static char *temp;
 
 static void initAttributeSets() {
     attributeSets = std::vector<AttributeSet>();
     
-    // Defaults:
+    { // Defaults:
         // Square or round body.
         defaultSet.add(Attribute::BODY_SHAPE, Attribute::SET, Shape::SQUARE, 1, 1);
         defaultSet.add(Attribute::BODY_SHAPE, Attribute::SET, Shape::CIRCLE, 1, 1);
@@ -30,7 +46,7 @@ static void initAttributeSets() {
         defaultSet.add(Attribute::EYE_BRI,    Attribute::SET, 190, 30, 1);
         
         // Blueish body hue.
-        defaultSet.add(Attribute::BODY_HUE,   Attribute::SET, 165, 70, 1);
+        defaultSet.add(Attribute::BODY_HUE,   Attribute::SET, 165, 30, 1);
         // Full body saturation.
         defaultSet.add(Attribute::BODY_SAT,   Attribute::SET, 255, 50, 1);
         // Mostly full body brightness.
@@ -40,12 +56,33 @@ static void initAttributeSets() {
         defaultSet.add(Attribute::ALT_SAT,    Attribute::SET, 255, 50, 1);
         // Less alt brightness.
         defaultSet.add(Attribute::ALT_BRI,    Attribute::SET, 130, 30, 1);
-    // The default set always applies.
+    } // The default set always applies.
     
-    // Dark side.
-    darkSide = AttributeSet("Dark Side");
-    darkSide.initialWeight  = 0.1;
-    darkSide.mutationWeight = 0.1;
+    /* ==== eyes ==== */
+    
+    { // Blue eyes.
+        // Blue to cyan hue.
+        eyeBlue.add(Attribute::EYE_HUE, Attribute::SET, 133, 5, 5);
+    attributeSets.push_back(eyeBlue);
+    } // Uncommon set.
+    
+    { // Brown eyes.
+        // Orange hue.
+        eyeBrown.add(Attribute::EYE_HUE, Attribute::SET, 28, 5, 5);
+        // Brown brightness.
+        eyeBrown.add(Attribute::EYE_BRI, Attribute::SET, 90, 10, 5);
+    attributeSets.push_back(eyeBrown);
+    } // Common set.
+    
+    { // Green eyes.
+        // Blue to cyan hue.
+        eyeGreen.add(Attribute::EYE_HUE, Attribute::SET, 75, 5, 5);
+    attributeSets.push_back(eyeGreen);
+    } // Uncommon set.
+    
+    /* ==== body ==== */
+    
+    { // Dark side.
         // Dark body.
         darkSide.add(Attribute::BODY_BRI,  Attribute::SET, 70, 7, 5);
         // Slightly brigher outline.
@@ -57,49 +94,42 @@ static void initAttributeSets() {
         // Chance of dark eyes.
         darkSide.add(Attribute::EYE_TYPE,  Attribute::SET, EyeType::DARK, 1, 2);
     attributeSets.push_back(darkSide);
+    } // Rare set.
     
-    // Slime.
-    slime = AttributeSet("Slime");
-    darkSide.initialWeight  = 0.1;
-    darkSide.mutationWeight = 0.1;
+    { // Slime.
         // Tends to be green.
         slime.add(Attribute::BODY_HUE, Attribute::SET, 96, 5, 10);
         // Adds cutout eyes.
         slime.add(Attribute::EYE_TYPE, Attribute::SET, EyeType::CUTOUT, 1, 5);
+        slime.add(Attribute::EYE_TYPE, Attribute::FORBID, EyeType::TRADITIONAL, 1, 1);
+        slime.add(Attribute::EYE_TYPE, Attribute::FORBID, EyeType::DARK, 1, 1);
+        // Incompatible with eye colors.
+        slime.markExclusive(eyeBlue);
+        slime.markExclusive(eyeGreen);
+        slime.markExclusive(eyeBrown);
+        slime.markExclusive(eyePurple);
+        slime.markExclusive(eyeOrange);
+        slime.markExclusive(eyeRed);
+        slime.markExclusive(eyeBlack);
     attributeSets.push_back(slime);
+    } // Rare set.
+    
 }
 
 void graphics_init() {
+    temp = new char[temp_len];
+    
     // Init attribute sets before blob.
     initAttributeSets();
 }
 
 void graphics_task() {
-    // Copy to prevent race conditions.
-    Player *companion = ::companion;
-    
     static bool hadCompanion = false;
     static bool wasLoaded = false;
     pax_background(&buf, 0);
     
-    // Show number of nearby people.
-    if (companion && !companionAgrees) {
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Cancel");
-    } else if (companion) {
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Leave");
-    } else if (!nearby) {
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Nobody nearby");
-    } else if (nearby == 1) {
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅴 1 person nearby");
-    } else {
-        char *tmp = new char[128];
-        snprintf(tmp, 128, "🅴 %d people nearby", nearby);
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, tmp);
-        delete tmp;
-    }
-    
     // Draw the AVATAARRRRR.
-    if (companion && companionAgrees) {
+    if (hasCompanion && companionAgrees) {
         if (!hadCompanion) {
             localPlayer->blob->pos.animateTo(buf.width/3, buf.height/2, 35, 1000);
             companion->blob->pos = Blob::Pos(buf.width*2/3, buf.height/2, 0);
@@ -118,18 +148,45 @@ void graphics_task() {
         wasLoaded = false;
     }
     
+    // Show number of nearby people.
+    if (hasCompanion && !companionAgrees) {
+        // Asking companion: Show cancel option.
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Cancel");
+        // Also show a little overlay.
+        snprintf(temp, temp_len, "Asking %s...", companion->getNick());
+        const pax_font_t *font = pax_font_saira_condensed;
+        pax_draw_rect(&buf, 0x7f000000, 0, (buf.height-font->default_size)/2, buf.width, font->default_size);
+        pax_center_text(&buf, 0xffffffff, font, font->default_size, buf.width/2, (buf.height-font->default_size)/2, temp);
+    } else if (hasCompanion) {
+        // Have companion; show leave option.
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Leave");
+    } else if (!nearby) {
+        // Nobody detected.
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Nobody nearby");
+    } else if (nearby == 1) {
+        // 1 person detected.
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅴 1 person nearby");
+    } else {
+        // Multiple people detected.
+        snprintf(temp, temp_len, "🅴 %d people nearby", nearby);
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, temp);
+    }
+    
+    // Debug menu.
+    for (int i = 0; i < attributeSets.size(); i++) {
+        pax_col_t col = localPlayer->blob->findSet(attributeSets[i]) != -1
+                      ? 0xff00ff00
+                      : 0xff9f9f9f;
+        pax_draw_text(&buf, col, pax_font_saira_regular, 18, 8, 25+18*i, attributeSets[i].name);
+    }
+    pax_draw_rect(&buf, 0xffffffff, 0, 31+18*debugAttrIndex, 6, 6);
+    
     disp_flush();
 }
 
 
 
-// Copy constructor.
-AttributeSet::AttributeSet(const AttributeSet &other) {
-    attributes     = other.attributes;
-    name           = strdup(other.name);
-    initialWeight  = other.initialWeight;
-    mutationWeight = other.mutationWeight;
-}
+static int lastSetId = 0;
 
 Attribute::Attribute() {}
 
@@ -144,17 +201,58 @@ Attribute::Attribute(Affects affects, Mode mode, float value, float range, float
 
 // Empty nameless set.
 AttributeSet::AttributeSet() {
-    this->name = strdup("");
+    this->id   = lastSetId++;
+    this->name = "";
 }
 
 // Empty named set.
-AttributeSet::AttributeSet(const char *name) {
-    this->name = strdup(name);
+AttributeSet::AttributeSet(const char *name, Rarity Rarity) {
+    this->id   = lastSetId++;
+    this->name = name;
+    this->id   = id;
+    
+    switch (Rarity) {
+        case COMMON:
+            this->mutationWeight = 10;
+            this->initialWeight  = 50;
+            break;
+            
+        case UNCOMMON:
+            this->mutationWeight = 5;
+            this->initialWeight  = 10;
+            break;
+            
+        case RARE:
+            this->mutationWeight = 3;
+            this->initialWeight  = 1;
+            break;
+            
+        case VERY_RARE:
+            this->mutationWeight = 2;
+            this->initialWeight  = 0;
+            break;
+            
+        case LEGENDARY:
+            this->mutationWeight = 1;
+            this->initialWeight  = 0;
+            break;
+            
+        default:
+        case UNOBTAINABLE:
+            this->mutationWeight = 0;
+            this->initialWeight  = 0;
+            break;
+    }
 }
 
 // Deconstructor.
 AttributeSet::~AttributeSet() {
-    delete name;
+    
+}
+
+// Get the unique ID of the set.
+uint32_t AttributeSet::getId() {
+    return id;
 }
 
 // Add an attribute to the set.
@@ -165,6 +263,17 @@ void AttributeSet::add(Attribute toAdd) {
 // Add an attribute to the set.
 void AttributeSet::add(Attribute::Affects affects, Attribute::Mode mode, float value, float range, float power) {
     attributes.push_back(Attribute(affects, mode, value, range, power));
+}
+
+// Test whether a set is mutually exclusive with this one.
+bool AttributeSet::isExclusive(AttributeSet &other) {
+    return exclusive.find(other.id) != exclusive.end();
+}
+
+// Make thie set mutually exclusive with another set.
+void AttributeSet::markExclusive(AttributeSet &other) {
+    exclusive.insert(other.id);
+    other.exclusive.insert(this->id);
 }
 
 
@@ -186,9 +295,8 @@ Blob::Blob() {
     blinkTime = 0;
     
     // Attributes.
-    attributes.push_back(defaultSet);
     attributes.push_back(darkSide);
-    attributes.push_back(slime);
+    // attributes.push_back(slime);
 }
 
 // Draws an n-gon based on a circle.
@@ -335,32 +443,106 @@ float Blob::getEdgeX(float y, float angle) {
     return 1;
 }
 
-// Apply the blob's attributes.
-// Even for the same attributes, the blob will look slightly different.
+// Tests whether this blob has a given attribute set.
+// If so, returns the index.
+// If not, returns -1.
+int Blob::findSet(AttributeSet &set) {
+    for (int i = 0; i < attributes.size(); i++) {
+        if (attributes[i].getId() == set.getId()) {
+            return i;
+        }
+    }
+    return -1;
+}
+
+// Toggle an attribute set.
+void Blob::toggleSet(AttributeSet &set) {
+    int i = findSet(set);
+    if (i != -1) {
+        attributes.erase(attributes.begin() + i);
+    } else {
+        attributes.push_back(set);
+    }
+    
+    for (int i = 0; i < set.attributes.size(); i++) {
+        changes.emplace(set.attributes[i].affects);
+    }
+}
+
+// Add an attribute set.
+void Blob::addSet(AttributeSet &set) {
+    int i = findSet(set);
+    if (i == -1) {
+        attributes.push_back(set);
+    }
+    
+    for (int i = 0; i < set.attributes.size(); i++) {
+        changes.emplace(set.attributes[i].affects);
+    }
+}
+
+// Remove an attribute set.
+void Blob::removeSet(AttributeSet &set) {
+    int i = findSet(set);
+    if (i != -1) {
+        attributes.erase(attributes.begin() + i);
+    }
+    
+    for (int i = 0; i < set.attributes.size(); i++) {
+        changes.emplace(set.attributes[i].affects);
+    }
+}
+
+// Apply the blob's attributes from scratch.
+void Blob::redoAttributes() {
+    for (int i = 0; i < Attribute::Affects::NUMBER; i++) {
+        changes.emplace((Attribute::Affects) i);
+    }
+    applyAttributes();
+}
+
+// Apply the blob's attributes, but only for changed affected variables.
 void Blob::applyAttributes() {
     int hue, sat, bri;
+    
     // Body shape.
-    body = (Shape) calculateAttribute(Attribute::BODY_SHAPE, Shape::SQUARE, Shape::CIRCLE);
+    if (hasChanged(Attribute::BODY_SHAPE))
+        body = (Shape) calculateAttribute(Attribute::BODY_SHAPE, Shape::SQUARE, Shape::CIRCLE);
     
     // Body color.
     hue = calculateAttribute(Attribute::BODY_HUE, 0, 255);
-    sat = calculateAttribute(Attribute::BODY_SAT, 0, 255);
-    bri = calculateAttribute(Attribute::BODY_BRI, 0, 255);
-    bodyColor = pax_col_hsv(hue, sat, bri);
+    if (hasChanged(Attribute::BODY_HUE) || hasChanged(Attribute::BODY_SAT) || hasChanged(Attribute::BODY_BRI)) {
+        sat = calculateAttribute(Attribute::BODY_SAT, 0, 255);
+        bri = calculateAttribute(Attribute::BODY_BRI, 0, 255);
+        bodyColor = pax_col_hsv(hue, sat, bri);
+    }
     
     // Alt color.
-    sat = calculateAttribute(Attribute::ALT_SAT, 0, 255);
-    bri = calculateAttribute(Attribute::ALT_BRI, 0, 255);
-    altColor = pax_col_hsv(hue, sat, bri);
+    if (hasChanged(Attribute::BODY_HUE) || hasChanged(Attribute::ALT_SAT) || hasChanged(Attribute::ALT_BRI)) {
+        sat = calculateAttribute(Attribute::ALT_SAT, 0, 255);
+        bri = calculateAttribute(Attribute::ALT_BRI, 0, 255);
+        altColor = pax_col_hsv(hue, sat, bri);
+    }
     
     // Eye color.
-    hue = calculateAttribute(Attribute::EYE_HUE, 0, 255);
-    sat = calculateAttribute(Attribute::EYE_SAT, 0, 255);
-    bri = calculateAttribute(Attribute::EYE_BRI, 0, 255);
-    eyeColor = pax_col_hsv(hue, sat, bri);
+    if (hasChanged(Attribute::EYE_HUE) || hasChanged(Attribute::EYE_SAT) || hasChanged(Attribute::EYE_BRI)) {
+        hue = calculateAttribute(Attribute::EYE_HUE, 0, 255);
+        sat = calculateAttribute(Attribute::EYE_SAT, 0, 255);
+        bri = calculateAttribute(Attribute::EYE_BRI, 0, 255);
+        eyeColor = pax_col_hsv(hue, sat, bri);
+    }
     
     // Eye type.
-    eyeType = (EyeType) calculateAttribute(Attribute::EYE_TYPE, EyeType::TRADITIONAL, EyeType::CUTOUT);
+    if (hasChanged(Attribute::EYE_TYPE))
+        eyeType = (EyeType) calculateAttribute(Attribute::EYE_TYPE, EyeType::TRADITIONAL, EyeType::CUTOUT);
+    
+    // Mark all as not changed.
+    changes.clear();
+}
+
+// Tests whether an attribute has changed.
+bool Blob::hasChanged(Attribute::Affects affected) {
+    return changes.find(affected) != changes.end();
 }
 
 // Adds a curve to the probabilities list.
@@ -391,6 +573,7 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
     for (int i = 0; i < possible; i++) probabilities[i] = 0;
     
     // Set pass.
+    bool needDefault = true;
     for (int x = 0; x < attributes.size(); x++) {
         AttributeSet *set = &attributes[x];
         for (int y = 0; y < set->attributes.size(); y++) {
@@ -398,6 +581,19 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
             if (attr->affects == affects && attr->mode == Attribute::SET) {
                 // Add it's value to the probs.
                 addCurve(probabilities, min, max, attr->value, attr->range, attr->power, false);
+                needDefault = false;
+            }
+        }
+    }
+    
+    // Defaults pass.
+    if (needDefault) {
+        for (int i = 0; i < defaultSet.attributes.size(); i++) {
+            Attribute *attr = &defaultSet.attributes[i];
+            if (attr->affects == affects && attr->mode == Attribute::SET) {
+                // Add it's value to the probs.
+                addCurve(probabilities, min, max, attr->value, attr->range, attr->power, false);
+                needDefault = false;
             }
         }
     }

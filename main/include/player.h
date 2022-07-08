@@ -34,6 +34,8 @@ class Player {
         Blob *blob;
         // The (optional) connection for this player.
         Connection *connection;
+        // Whether this player has asked us to be their companion.
+        bool askedUsOut;
         
         // Make an empty player.
         Player();

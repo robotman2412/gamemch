@@ -70,7 +70,7 @@ Player *loadFromNvs() {
     
     // Set the BLOB.
     player->blob = new Blob();
-    player->blob->applyAttributes();
+    player->blob->redoAttributes();
     
     // Clean up.
     delete nick;
@@ -92,6 +92,7 @@ Player::Player() {
     doBroadcast = false;
     blob        = new Blob();
     connection  = NULL;
+    askedUsOut  = false;
 }
 
 // Make a new player.
@@ -102,6 +103,7 @@ Player::Player(const char *newNickname) {
     status      = InteractStatus::IDLE;
     doBroadcast = false;
     connection  = NULL;
+    askedUsOut  = false;
 }
 
 Player::~Player() {
@@ -127,8 +129,13 @@ void Player::dataCallback(Connection *from, const char *type, const char *data) 
         // Data for the blob.
         blob->receive(from, type, data);
     } else if (!strcmp(type, "info") && !strcmp(data, "blob")) {
-        // Send blob.
-        localPlayer->blob->send(from);
+        if (from->player == companion) {
+            // Send full blob.
+            localPlayer->blob->send(from);
+        } else {
+            // Only send blob color.
+            from->sendNum("blob_body_col", localPlayer->blob->bodyColor);
+        }
     }
 }
 

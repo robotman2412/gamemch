@@ -8,8 +8,25 @@ class Blob;
 #include "main.h"
 #include <pax_gfx.h>
 #include <vector>
+#include <set>
 
 extern std::vector<AttributeSet> attributeSets;
+extern int debugAttrIndex;
+
+typedef enum {
+    // Commonplace.
+    COMMON,
+    // Slightly less common but still common.
+    UNCOMMON,
+    // Hard to obtain.
+    RARE,
+    // Very hard to obtain, only obtained by trading.
+    VERY_RARE,
+    // Hardest to obtain, only obtained by trading.
+    LEGENDARY,
+    // Can only be obtained by trading.
+    UNOBTAINABLE,
+} Rarity;
 
 typedef enum {
     UNDEFINED,
@@ -54,6 +71,7 @@ class Attribute {
             EYE_SAT,
             // Eye color: Brightness (0 to 255).
             EYE_BRI,
+            NUMBER,
         } Affects;
         // Ways in which attributes are affected.
         typedef enum {
@@ -86,9 +104,13 @@ class Attribute {
 // An collection of attributes that are applied simultaneously.
 class AttributeSet {
     private:
-        // The name of this set.
-        char *name;
+        // The ID of this set.
+        uint32_t id;
+        // Mutually exclusive with.
+        std::set<uint32_t> exclusive;
     public:
+        // The name of this set.
+        const char *name;
         // All attributes affected.
         std::vector<Attribute> attributes;
         // The weight of this set in first time blob.
@@ -96,16 +118,20 @@ class AttributeSet {
         // The weight of this set in mutations.
         float mutationWeight;
         
-        // Copy constructor.
-        AttributeSet(const AttributeSet &other);
         // Empty nameless set.
         AttributeSet();
         // Empty named set.
-        AttributeSet(const char *name);
+        // The name must not be deallocated.
+        // Rarity is used to preset weights.
+        AttributeSet(const char *name, Rarity rarity);
         // Deconstructor.
         ~AttributeSet();
-        // Get the name of the set.
-        const char *getName();
+        // Get the unique ID of the set.
+        uint32_t getId();
+        // Test whether a set is mutually exclusive with this one.
+        bool isExclusive(AttributeSet &other);
+        // Make thie set mutually exclusive with another set.
+        void markExclusive(AttributeSet &other);
         // Add an attribute to the set.
         void add(Attribute toAdd);
         // Add an attribute to the set.
@@ -160,6 +186,8 @@ class Blob {
         };
         // Attributes that affected the current look.
         std::vector<AttributeSet> attributes;
+        // All attributes that have changed.
+        std::set<Attribute::Affects> changes;
         
         // Position of all arms.
         std::vector<Pos> arms;
@@ -198,9 +226,24 @@ class Blob {
         void draw();
         // Gets X counterpart for a given Y on the edge of the blob.
         float getEdgeX(float y, float angle);
-        // Apply the blob's attributes.
-        // Even for the same attributes, the blob will look slightly different.
+        
+        // Tests whether this blob has a given attribute set.
+        // If so, returns the index.
+        // If not, returns -1.
+        int findSet(AttributeSet &set);
+        // Toggle an attribute set.
+        void toggleSet(AttributeSet &set);
+        // Add an attribute set.
+        void addSet(AttributeSet &set);
+        // Remove an attribute set.
+        void removeSet(AttributeSet &set);
+        // Apply the blob's attributes from scratch.
+        void redoAttributes();
+        // Apply the blob's attributes, but only for changed affected variables.
         void applyAttributes();
+        // Tests whether an attribute has changed.
+        bool hasChanged(Attribute::Affects affected);
+        
         // Send the blob to a given connection.
         void send(Connection *to);
         // Receive blob data from a given connection.

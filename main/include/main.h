@@ -63,6 +63,7 @@ extern pax_buf_t buf;
 extern xQueueHandle buttonQueue;
 extern Player *localPlayer;
 extern Player *companion;
+extern bool hasCompanion;
 extern bool companionAgrees;
 
 // Broadcast info obout ourselves.
