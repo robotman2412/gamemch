@@ -67,9 +67,7 @@ static void initAttributeSets() {
     } // Uncommon set.
     
     { // Brown eyes.
-        // Orange hue.
         eyeBrown.add(Attribute::EYE_HUE, Attribute::SET, 28, 5, 5);
-        // Brown brightness.
         eyeBrown.add(Attribute::EYE_BRI, Attribute::SET, 90, 10, 5);
     attributeSets.push_back(eyeBrown);
     } // Common set.
@@ -80,17 +78,29 @@ static void initAttributeSets() {
     attributeSets.push_back(eyeGreen);
     } // Uncommon set.
     
+    { // Purple eyes.
+        eyePurple.add(Attribute::EYE_HUE, Attribute::SET, 194, 5, 5);
+    attributeSets.push_back(eyePurple);
+    } // Very rare set.
+    
+    { // Orange eyes.
+        eyeOrange.add(Attribute::EYE_HUE, Attribute::SET, 28, 5, 5);
+        eyeBrown.add(Attribute::EYE_BRI, Attribute::SET, 255, 5, 5);
+        eyeBrown.add(Attribute::EYE_SAT, Attribute::SET, 210, 5, 5);
+    attributeSets.push_back(eyeOrange);
+    } // Very rare set.
+    
     /* ==== body ==== */
     
     { // Dark side.
         // Dark body.
-        darkSide.add(Attribute::BODY_BRI,  Attribute::SET, 70, 7, 5);
+        darkSide.add(Attribute::BODY_BRI,  Attribute::SET, 90, 7, 5);
         // Slightly brigher outline.
-        darkSide.add(Attribute::ALT_BRI,   Attribute::SET, 90, 7, 5);
+        darkSide.add(Attribute::ALT_BRI,   Attribute::SET, 130, 7, 5);
         // Less eye saturation.
         darkSide.add(Attribute::EYE_SAT,   Attribute::SET, 130, 20, 3);
         // More eye brightness.
-        darkSide.add(Attribute::EYE_BRI,   Attribute::SET, 255, 50, 10);
+        darkSide.add(Attribute::EYE_BRI,   Attribute::SET, 240, 50, 10);
         // Chance of dark eyes.
         darkSide.add(Attribute::EYE_TYPE,  Attribute::SET, EyeType::DARK, 1, 2);
     attributeSets.push_back(darkSide);
