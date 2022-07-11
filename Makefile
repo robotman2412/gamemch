@@ -20,7 +20,7 @@ build:
 	source "$(IDF_PATH)/export.sh" && idf.py build
 
 install: prepare build
-	python3 tools/webusb_push.py "Template App" build/main.bin --run
+	python3 tools/webusb_push.py "Template App" build/main.bin --run --address=$(DEVICE)
 
 massinstall: prepare build
 	./massinstall.sh
