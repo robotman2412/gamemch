@@ -111,6 +111,8 @@ class AttributeSet {
     public:
         // The name of this set.
         const char *name;
+        // The network ID of this set.
+        const char *netId;
         // All attributes affected.
         std::vector<Attribute> attributes;
         // The weight of this set in first time blob.
@@ -123,7 +125,7 @@ class AttributeSet {
         // Empty named set.
         // The name must not be deallocated.
         // Rarity is used to preset weights.
-        AttributeSet(const char *name, Rarity rarity);
+        AttributeSet(const char *netId, const char *name, Rarity rarity);
         // Deconstructor.
         ~AttributeSet();
         // Get the unique ID of the set.
@@ -243,6 +245,8 @@ class Blob {
         void applyAttributes();
         // Tests whether an attribute has changed.
         bool hasChanged(Attribute::Affects affected);
+        // Mutate with another blob.
+        void mutate(Blob *with);
         
         // Send the blob to a given connection.
         void send(Connection *to);

@@ -13,6 +13,8 @@ Player *companion;
 bool hasCompanion;
 bool companionAgrees;
 Screen currentScreen;
+std::vector<int> companionList;
+int companionListIndex;
 
 static const char *TAG = "main";
 
@@ -67,6 +69,9 @@ extern "C" void app_main() {
     currentScreen = Screen::HOME;
     
     while (1) {
+        if (currentScreen == Screen::COMP_SELECT) {
+            refreshCompanionList();
+        }
         graphics_task();
         
         now = esp_timer_get_time() / 1000;
@@ -86,38 +91,56 @@ extern "C" void app_main() {
                 exit_to_launcher();
                 
             } else if (message.input == RP2040_INPUT_JOYSTICK_UP && message.state) {
-                // Debug: Previous set.
-                if (debugAttrIndex > 0) debugAttrIndex --;
+                if (currentScreen == Screen::HOME) {
+                    // Debug: Previous set.
+                    if (debugAttrIndex > 0) debugAttrIndex --;
+                }
+                companionListIndex --;
                 
             } else if (message.input == RP2040_INPUT_JOYSTICK_DOWN && message.state) {
-                // Debug: Next set.
-                if (debugAttrIndex < attributeSets.size() - 1) debugAttrIndex ++;
+                if (currentScreen == Screen::HOME) {
+                    // Debug: Next set.
+                    if (debugAttrIndex < attributeSets.size() - 1) debugAttrIndex ++;
+                }
+                companionListIndex ++;
                 
             } else if (message.input == RP2040_INPUT_BUTTON_ACCEPT && message.state) {
-                // Debug: Toggle set.
-                localPlayer->blob->toggleSet(attributeSets[debugAttrIndex]);
-                localPlayer->blob->applyAttributes();
-                if (companion) {
-                    localPlayer->blob->send(companion->connection);
+                if (currentScreen == Screen::HOME) {
+                    // Debug: Toggle set.
+                    localPlayer->blob->toggleSet(attributeSets[debugAttrIndex]);
+                    localPlayer->blob->applyAttributes();
+                    if (companion) {
+                        localPlayer->blob->send(companion->connection);
+                    }
+                }
+                if (currentScreen == Screen::COMP_SELECT) {
+                    // Ask thel compañor.
+                    currentScreen = Screen::COMP_AWAIT;
+                    askCompanion(connections[companionList[companionListIndex]]);
                 }
                 
             } else if (message.input == RP2040_INPUT_BUTTON_SELECT && message.state && !hasCompanion) {
-                // Go to interaction menu.
                 if (nearby == 1) {
                     // Just ask this one directly.
-                    askCompanion(firstNearby);
                     currentScreen = Screen::COMP_AWAIT;
+                    askCompanion(firstNearby);
                 } else if (nearby) {
                     // Go to the selection menu.
                     currentScreen = Screen::COMP_SELECT;
                 }
                 
-            } else if (message.input == RP2040_INPUT_BUTTON_BACK && message.state && hasCompanion) {
-                // Manually leave.
-                companion->connection->send("info", "leave");
-                companion->askedUsOut = false;
-                setCompanion(NULL, false);
-                currentScreen = Screen::HOME;
+            } else if (message.input == RP2040_INPUT_BUTTON_BACK && message.state) {
+                if (hasCompanion || currentScreen == Screen::COMP_AWAIT) {
+                    // Manually leave.
+                    companion->connection->send("info", "leave");
+                    companion->askedUsOut = false;
+                    setCompanion(NULL, false);
+                    currentScreen = Screen::HOME;
+                }
+                if (currentScreen == Screen::COMP_SELECT) {
+                    // Cancel selecting.
+                    currentScreen = Screen::HOME;
+                }
                 
             } else if (message.input == RP2040_INPUT_JOYSTICK_PRESS && message.state) {
                 // Debug: Change blob with maximum random.
@@ -125,6 +148,12 @@ extern "C" void app_main() {
                 if (companion) {
                     localPlayer->blob->send(companion->connection);
                 }
+                
+            } else if (message.input == RP2040_INPUT_BUTTON_MENU && message.state && hasCompanion) {
+                // Debug: Do the mutator.
+                localPlayer->blob->mutate(companion->blob);
+                localPlayer->blob->send(companion->connection);
+                
             }
         }
     }
@@ -149,13 +178,16 @@ void askCompanion(Connection *to) {
         // They didn't ask us yet, so ask them first.
         setCompanion(to, false);
         to->send    ("info",  "request_companion");
+        currentScreen = Screen::COMP_AWAIT;
+        ESP_LOGI(TAG, "Out request %s", to->player->getNick());
     } else {
         // They already asked us, so accept.
         setCompanion(to, true);
         to->send    ("info",  "accept_companion");
+        currentScreen = Screen::HOME;
+        ESP_LOGI(TAG, "Out accept %s", to->player->getNick());
     }
 }
-
 
 // Sets the companion.
 void setCompanion(Connection *to, bool agrees) {
@@ -174,11 +206,28 @@ void setCompanion(Connection *to, bool agrees) {
     }
 }
 
+// Refreshes the list of candidate companions.
+void refreshCompanionList() {
+    // Hacky thing for now.
+    companionList.clear();
+    for (int i = 0; i < connections.size(); i++) {
+        Connection *conn = connections[i];
+        if (conn->status == Connection::OPEN) {
+            companionList.push_back(i);
+        }
+    }
+    if (companionListIndex >= companionList.size()) {
+        companionListIndex = 0;
+    } else if (companionListIndex < 0) {
+        companionListIndex = companionList.size() - 1;
+    }
+}
+
 
 
 // Data event handling.
 void mainDataCallback(Connection *from, const char *type, const char *data) {
-    ESP_LOGI(TAG, "Message from %s: %s: %s", from->peer, type, data);
+    // ESP_LOGI(TAG, "Message from %s: %s: %s", from->peer, type, data);
     
     if (!strcmp(type, "info")) {
         if (!strcmp(data, "accept_companion")) {
@@ -186,24 +235,31 @@ void mainDataCallback(Connection *from, const char *type, const char *data) {
             if (companion == from->player) {
                 // We asked them, set the accepted flag.
                 setCompanion(from, true);
+                ESP_LOGI(TAG, "In accept %s", from->player->getNick());
             } else {
                 // We didn't ask them, clear up the miscommunication.
                 from->send("info", "leave");
+                ESP_LOGI(TAG, "Miscomm %s", from->player->getNick());
             }
             
         } else if (!strcmp(data, "request_companion")) {
             // They have officially asked us out.
             from->player->askedUsOut = true;
+            ESP_LOGI(TAG, "In request %s", from->player->getNick());
             
-            if (companion == from->player && hasCompanion && !companionAgrees) {
+            if (hasCompanion && companion == from->player) {
                 // We asked them, so accept.
                 from->send("info", "accept_companion");
                 setCompanion(from, true);
+                ESP_LOGI(TAG, "Out accept %s", from->player->getNick());
             }
             
         } else if (!strcmp(data, "leave") && hasCompanion) {
             // Our companion leaves.
-            setCompanion(NULL, false);
+            if (companion == from->player) {
+                setCompanion(NULL, false);
+                ESP_LOGI(TAG, "In leave %s", from->player->getNick());
+            }
             from->player->askedUsOut = false;
         }
     }
@@ -216,6 +272,7 @@ void mainStatusCallback(Connection *from) {
     if (hasCompanion && from->player == companion) {
         // Our companion lost connection.
         companion->connection->send("info", "leave");
+        ESP_LOGI(TAG, "Disconn %s", from->player->getNick());
         setCompanion(NULL, false);
         currentScreen = Screen::HOME;
     }

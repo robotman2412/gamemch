@@ -52,6 +52,8 @@ typedef enum {
 
 extern Screen currentScreen;
 
+#include <vector>
+
 // For local connectivity.
 #include "connection.h"
 #include "espnowwrapper.h"
@@ -65,6 +67,8 @@ extern Player *localPlayer;
 extern Player *companion;
 extern bool hasCompanion;
 extern bool companionAgrees;
+extern std::vector<int> companionList;
+extern int companionListIndex;
 
 // Broadcast info obout ourselves.
 void broadcastInfo();
@@ -72,6 +76,8 @@ void broadcastInfo();
 void askCompanion(Connection *to);
 // Sets the companion.
 void setCompanion(Connection *to, bool agrees);
+// Refreshes the list of candidate companions.
+void refreshCompanionList();
 
 // Data event handling.
 void mainDataCallback(Connection *from, const char *type, const char *data);

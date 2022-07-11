@@ -103,6 +103,8 @@ class Connection {
 		std::vector<StatusCallback> statusCallbacks;
 		// Name of the peer.
 		char *peer;
+		// MAC address of the peer.
+		uint8_t peer_addr[6];
 		// Send callback of the connection.
 		SendCallback sendCallback;
 		// Number of times to retransmit messages that aren't confirmed.

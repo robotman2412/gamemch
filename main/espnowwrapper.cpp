@@ -113,14 +113,46 @@ void espnowRecvCallback(const uint8_t *mac_addr, const uint8_t *data, int data_l
         );
         conn = new Connection(espnowSendCallback);
         conn->dataCallbacks.push_back(mainDataCallback);
+        conn->statusCallbacks.push_back(espnowStatusCallback);
         conn->statusCallbacks.push_back(mainStatusCallback);
         conn->peer = id;
         espnowConnMap[mac_pak] = conn;
+        memcpy(conn->peer_addr, mac_addr, 6);
+        // Set it open.
+        conn->setStatus(Connection::OPEN);
     }
     // Handle data on it.
     conn->onData(&data[sizeof(magic)], data_len - sizeof(magic));
 }
 
-void espnowSendCallback(Connection *from, const char *cstr) {
-    espnow_broadcast_raw(cstr);
+void espnowSendCallback(Connection *from, const char *msg) {
+    if (from == broadcaster) {
+        espnow_broadcast_raw(msg);
+    } else {
+        char *buffer = new char[strlen(msg)+sizeof(magic)+1];
+        memcpy(buffer, magic, sizeof(magic));
+        memcpy(buffer+sizeof(magic), msg, strlen(msg)+1);
+        
+        esp_err_t res = esp_now_send(from->peer_addr, (const uint8_t *) buffer, strlen(buffer));
+        if (res) {
+            ESP_LOGE(TAG, "Send error: %s", esp_err_to_name(res));
+        }
+        
+        delete buffer;
+    }
+}
+
+void espnowStatusCallback(Connection *from) {
+    if (from->status == Connection::OPEN) {
+        // Register peer thingy.
+        esp_now_peer_info_t peer_info;
+        peer_info.channel = 1;
+        memcpy(peer_info.peer_addr, from->peer_addr, 6);
+        peer_info.ifidx   = WIFI_IF_AP;
+        peer_info.encrypt = false;
+        esp_now_add_peer(&peer_info);
+    } else if (from->status != Connection::OPENING) {
+        // Remove thel peer to free memories.
+        esp_now_del_peer(from->peer_addr);
+    }
 }

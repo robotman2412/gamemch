@@ -7,20 +7,20 @@
 
 static const char *TAG = "graphics";
 
-AttributeSet defaultSet ("", Rarity::UNOBTAINABLE);
+AttributeSet defaultSet ("defaultSet",  "", Rarity::UNOBTAINABLE);
 
 /* ==== eyes ==== */
-AttributeSet eyeBlue    ("Blue Eyes",   Rarity::UNCOMMON);
-AttributeSet eyeGreen   ("Green Eyes",  Rarity::COMMON);
-AttributeSet eyeBrown   ("Brown Eyes",  Rarity::COMMON);
-AttributeSet eyePurple  ("Purple Eyes", Rarity::VERY_RARE);
-AttributeSet eyeOrange  ("Orange Eyes", Rarity::VERY_RARE);
-AttributeSet eyeRed     ("Red Eyes",    Rarity::LEGENDARY);
-AttributeSet eyeBlack   ("Black Eyes",  Rarity::LEGENDARY);
+AttributeSet eyeBlue    ("eyeBlue",     "Blue Eyes",   Rarity::UNCOMMON);
+AttributeSet eyeGreen   ("eyeGreen",    "Green Eyes",  Rarity::COMMON);
+AttributeSet eyeBrown   ("eyeBrown",    "Brown Eyes",  Rarity::COMMON);
+AttributeSet eyePurple  ("eyePurple",   "Purple Eyes", Rarity::VERY_RARE);
+AttributeSet eyeOrange  ("eyeOrange",   "Orange Eyes", Rarity::VERY_RARE);
+AttributeSet eyeRed     ("eyeRed",      "Red Eyes",    Rarity::LEGENDARY);
+AttributeSet eyeBlack   ("eyeBlack",    "Black Eyes",  Rarity::LEGENDARY);
 
 /* ==== body ==== */
-AttributeSet darkSide   ("Dark Side",   Rarity::RARE);
-AttributeSet slime      ("Slime",       Rarity::RARE);
+AttributeSet darkSide   ("darkSide",    "Dark Side",   Rarity::RARE);
+AttributeSet slime      ("slime",       "Slime",       Rarity::RARE);
 
 std::vector<AttributeSet> attributeSets;
 int debugAttrIndex = 0;
@@ -158,8 +158,7 @@ void graphics_task() {
         wasLoaded = false;
     }
     
-    // Show number of nearby people.
-    if (hasCompanion && !companionAgrees) {
+    if (currentScreen == Screen::COMP_AWAIT) {
         // Asking companion: Show cancel option.
         pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Cancel");
         // Also show a little overlay.
@@ -167,29 +166,42 @@ void graphics_task() {
         const pax_font_t *font = pax_font_saira_condensed;
         pax_draw_rect(&buf, 0x7f000000, 0, (buf.height-font->default_size)/2, buf.width, font->default_size);
         pax_center_text(&buf, 0xffffffff, font, font->default_size, buf.width/2, (buf.height-font->default_size)/2, temp);
-    } else if (hasCompanion) {
-        // Have companion; show leave option.
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Leave");
-    } else if (!nearby) {
-        // Nobody detected.
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Nobody nearby");
-    } else if (nearby == 1) {
-        // 1 person detected.
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅴 1 person nearby");
-    } else {
-        // Multiple people detected.
-        snprintf(temp, temp_len, "🅴 %d people nearby", nearby);
-        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, temp);
+    } else if (currentScreen == Screen::HOME) {
+        if (hasCompanion) {
+            // Have companion; show leave option.
+            pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Leave");
+        } else if (!nearby) {
+            // Nobody detected.
+            pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Nobody nearby");
+        } else if (nearby == 1) {
+            // 1 person detected.
+            pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅴 1 person nearby");
+        } else {
+            // Multiple people detected.
+            snprintf(temp, temp_len, "🅴 %d people nearby", nearby);
+            pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, temp);
+        }
+    } else if (currentScreen == COMP_SELECT) {
+        // Draw a kinda crappy selection list.
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "↑↓Navigate 🅰Select 🅱Cancel");
+        for (int i = 0; i < companionList.size(); i++) {
+            pax_col_t col = i == companionListIndex ? 0xffffffff : 0xff9f9f9f;
+            const char *str = connections[companionList[i]]->player->getNick();
+            pax_draw_text(&buf, col, pax_font_saira_regular, 18, 8, 25+18*i, str);
+        }
+        pax_draw_rect(&buf, 0xffffffff, 0, 31+18*companionListIndex, 6, 6);
     }
     
     // Debug menu.
-    for (int i = 0; i < attributeSets.size(); i++) {
-        pax_col_t col = localPlayer->blob->findSet(attributeSets[i]) != -1
-                      ? 0xff00ff00
-                      : 0xff9f9f9f;
-        pax_draw_text(&buf, col, pax_font_saira_regular, 18, 8, 25+18*i, attributeSets[i].name);
+    if (currentScreen == Screen::HOME) {
+        for (int i = 0; i < attributeSets.size(); i++) {
+            pax_col_t col = localPlayer->blob->findSet(attributeSets[i]) != -1
+                        ? 0xff00ff00
+                        : 0xff9f9f9f;
+            pax_draw_text(&buf, col, pax_font_saira_regular, 18, 8, 25+18*i, attributeSets[i].name);
+        }
+        pax_draw_rect(&buf, 0xffffffff, 0, 31+18*debugAttrIndex, 6, 6);
     }
-    pax_draw_rect(&buf, 0xffffffff, 0, 31+18*debugAttrIndex, 6, 6);
     
     disp_flush();
 }
@@ -216,10 +228,11 @@ AttributeSet::AttributeSet() {
 }
 
 // Empty named set.
-AttributeSet::AttributeSet(const char *name, Rarity Rarity) {
-    this->id   = lastSetId++;
-    this->name = name;
-    this->id   = id;
+AttributeSet::AttributeSet(const char *netId, const char *name, Rarity Rarity) {
+    this->id    = lastSetId++;
+    this->netId = netId;
+    this->name  = name;
+    this->id    = id;
     
     switch (Rarity) {
         case COMMON:
@@ -641,6 +654,24 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
     // Clean up.
     delete probabilities;
     return value;
+}
+
+// Mutate with another blob.
+void Blob::mutate(Blob *with) {
+    // TODO: Remove own attr.
+    
+    // Copy the attr. list.
+    std::vector<AttributeSet> list = with->attributes;
+    
+    // Randomly pick a fraction of it's attributes.
+    float  maxFrac = 0.4;
+    size_t max = ceilf(list.size() * maxFrac);
+    while (max && list.size()) {
+        auto iter = list.begin() + (esp_random() / (float) UINT32_MAX * list.size());
+        list.erase(iter);
+        addSet(*iter);
+        max --;
+    }
 }
 
 
