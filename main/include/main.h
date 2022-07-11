@@ -61,14 +61,24 @@ extern Screen currentScreen;
 #include "player.h"
 #include "graphics.h"
 
+// The graphics buffer.
 extern pax_buf_t buf;
+// The queue which receives button events.
 extern xQueueHandle buttonQueue;
+// Info about you as a player.
 extern Player *localPlayer;
+// Info about the companion player.
 extern Player *companion;
+// Whether there is a (candidate) companion player.
 extern bool hasCompanion;
+// Whether the companion player has accepted.
 extern bool companionAgrees;
+// The list of players eligable to be a companion.
 extern std::vector<int> companionList;
+// The selected player in the companion list.
 extern int companionListIndex;
+// The candidate mutations.
+extern std::vector<Blob> mutationCandidates;
 
 // Broadcast info obout ourselves.
 void broadcastInfo();

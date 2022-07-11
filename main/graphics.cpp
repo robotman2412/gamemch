@@ -786,7 +786,6 @@ void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) 
             if (index < 0 || index >= attributes.size()) {
                 // Enforce index constraints.
                 attributes[index] = *set;
-                ESP_LOGI(TAG, "Recv set %s", set->name, attributes.size());
             }
         } else {
             // Ignore it if it's unknown.
