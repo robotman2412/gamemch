@@ -3,6 +3,7 @@ BUILDDIR ?= build
 IDF_PATH ?= $(shell pwd)/esp-idf
 IDF_EXPORT_QUIET ?= 0
 SHELL := /usr/bin/env bash
+DEVICE ?= default
 
 .PHONY: prepare clean build flash erase monitor menuconfig
 
@@ -20,6 +21,9 @@ build:
 
 install: prepare build
 	python3 tools/webusb_push.py "Template App" build/main.bin --run
+
+massinstall: prepare build
+	./massinstall.sh
 
 erase:
 	source "$(IDF_PATH)/export.sh" && idf.py erase-flash -p $(PORT)
