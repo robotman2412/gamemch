@@ -152,6 +152,7 @@ extern "C" void app_main() {
             } else if (message.input == RP2040_INPUT_BUTTON_MENU && message.state && hasCompanion) {
                 // Debug: Do the mutator.
                 localPlayer->blob->mutate(companion->blob);
+                localPlayer->blob->applyAttributes();
                 localPlayer->blob->send(companion->connection);
                 
             }

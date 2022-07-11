@@ -257,5 +257,6 @@ class Blob {
         int calculateAttribute(Attribute::Affects affects, int min, int max);
 };
 
+AttributeSet *getSetById(const char *id);
 void graphics_init();
 void graphics_task();

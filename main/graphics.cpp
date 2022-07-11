@@ -221,10 +221,24 @@ Attribute::Attribute(Affects affects, Mode mode, float value, float range, float
     this->power   = power;
 }
 
+// Get an attribute set by id.
+AttributeSet *getSetById(const char *id) {
+    // Iterate attribute sets.
+    for (auto iter = attributeSets.begin(); iter != attributeSets.end(); iter ++) {
+        if (!strcmp((*iter).netId, id)) {
+            return &*iter;
+        }
+    }
+    
+    // Not found.
+    return NULL;
+}
+
 // Empty nameless set.
 AttributeSet::AttributeSet() {
-    this->id   = lastSetId++;
-    this->name = "";
+    this->id    = lastSetId++;
+    this->name  = "";
+    this->netId = "";
 }
 
 // Empty named set.
@@ -316,10 +330,6 @@ Blob::Blob() {
     lookingAt = Pos();
     pos       = Pos(buf.width/2.0, buf.height/2.0, 50);
     blinkTime = 0;
-    
-    // Attributes.
-    attributes.push_back(darkSide);
-    // attributes.push_back(slime);
 }
 
 // Draws an n-gon based on a circle.
@@ -663,6 +673,17 @@ void Blob::mutate(Blob *with) {
     // Copy the attr. list.
     std::vector<AttributeSet> list = with->attributes;
     
+    // Eliminate unknown attribute sets.
+    for (auto iter = list.begin(); iter != list.end();) {
+        if (!*iter->name) {
+            // Empty name is considered unknown set.
+            iter = list.erase(iter);
+        } else {
+            // Don't increment iter when erasing.
+            iter ++;
+        }
+    }
+    
     // Randomly pick a fraction of it's attributes.
     float  maxFrac = 0.4;
     size_t max = ceilf(list.size() * maxFrac);
@@ -696,31 +717,81 @@ void Blob::send(Connection *to) {
     // Send mouth.
     mouth.send(to, "blob_mouth");
     mouthBias.send(to, "blob_mouth_bias");
+    // Send attributes.
+    to->sendNum("blob_attrs_count", attributes.size());
+    for (int i = 0; i < attributes.size(); i++) {
+        snprintf(temp, 32, "blob_attrs/%d", i);
+        to->send(temp, attributes[i].netId);
+    }
     
     delete temp;
 }
 
 // Receive blob data from a given connection.
 void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) {
-    ESP_LOGI(TAG, "I was ACK! (%s: %s)", tmpTopic, tmpData);
     if (!strcmp(tmpTopic, "blob_body")) {
+        // Body shape thingy.
         body = (Shape) atoi(tmpData);
+        
     } else if (!strcmp(tmpTopic, "blob_body_col")) {
+        // Body color thingy.
         bodyColor = atoi(tmpData);
+        
     } else if (!strcmp(tmpTopic, "blob_alt_col")) {
+        // Edge color thingy.
         altColor = atoi(tmpData);
+        
     } else if (!strcmp(tmpTopic, "blob_looking")) {
+        // Looking at direction.
         lookingAt = Pos(tmpData);
+        
     } else if (!strcmp(tmpTopic, "blob_mouth")) {
+        // Mouth position.
         mouth = Pos(tmpData);
+        
     } else if (!strcmp(tmpTopic, "blob_mouth_bias")) {
+        // Mouth bias.
         mouthBias = Pos(tmpData);
+        
     } else if (!strcmp(tmpTopic, "blob_eye_col")) {
+        // Eye color.
         eyeColor = atoi(tmpData);
+        
     } else if (!strcmp(tmpTopic, "blob_eye_type")) {
+        // Eye type.
         eyeType = (EyeType) atoi(tmpData);
+        
     } else if (!strcmp(tmpTopic, "blob_eye_count")) {
-        // eyes.clear();
+        // Double check count.
+        int newSize = atoi(tmpData);
+        if (newSize <= 0 || newSize > 10) ESP_LOGW(TAG, "Invalid eye count %d", newSize);
+        // Resize array.
+        while (eyes.size() > newSize) eyes.erase(eyes.begin() + newSize);
+        while (eyes.size() < newSize) eyes.push_back(Pos());
+        
+    } else if (!strcmp(tmpTopic, "blob_attrs_count")) {
+        // Double check count.
+        int newSize = atoi(tmpData);
+        if (newSize <= 0 || newSize > 20) ESP_LOGW(TAG, "Invalid attribute count %d", newSize);
+        // Resize array.
+        while (attributes.size() > newSize) attributes.erase(attributes.begin() + newSize);
+        while (attributes.size() < newSize) attributes.push_back(AttributeSet());
+        
+    } else if (!strncmp(tmpTopic, "blob_attrs/", 11)) {
+        // Decode ID.
+        AttributeSet *set = getSetById(tmpData);
+        if (set) {
+            // Decode index.
+            int index = atoi(tmpTopic + 11);
+            if (index < 0 || index >= attributes.size()) {
+                // Enforce index constraints.
+                attributes[index] = *set;
+                ESP_LOGI(TAG, "Recv set %s", set->name, attributes.size());
+            }
+        } else {
+            // Ignore it if it's unknown.
+            ESP_LOGW(TAG, "Unknown Set '%s'", tmpData);
+        }
     }
 }
 
