@@ -1,6 +1,8 @@
 
 #pragma once
 
+// #define ENABLE_DEBUG
+
 #ifdef __cplusplus
 extern "C" {
 #endif //__cplusplus
@@ -48,6 +50,8 @@ typedef enum {
     COMP_SELECT,
     // We have asked the companion, await confirmation.
     COMP_AWAIT,
+    // Pick a mutation.
+    MUTATE_PICK,
 } Screen;
 
 extern Screen currentScreen;
@@ -77,8 +81,10 @@ extern bool companionAgrees;
 extern std::vector<int> companionList;
 // The selected player in the companion list.
 extern int companionListIndex;
-// The candidate mutations.
+// The mutated blobs the player picks from.
 extern std::vector<Blob> mutationCandidates;
+
+extern Connection *broadcaster;
 
 // Broadcast info obout ourselves.
 void broadcastInfo();

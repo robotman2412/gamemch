@@ -12,7 +12,7 @@ fi
 
 # Start tasks.
 for dev in $badges; do
-    python3 tools/webusb_push.py "Template App" build/main.bin --run --address=$dev &
+    python3 tools/webusb_push.py "Spwn" build/main.bin --run --address=$dev &
 done
 
 function abort() {

@@ -1,5 +1,6 @@
 
 #include "graphics.h"
+#include "connection.h"
 #include "player.h"
 #include "string.h"
 
@@ -7,20 +8,26 @@
 
 static const char *TAG = "graphics";
 
-AttributeSet defaultSet ("defaultSet",  "", Rarity::UNOBTAINABLE);
+AttributeSet defaultSet ("defaultSet",  "",            Rarity::UNOBTAINABLE);
 
 /* ==== eyes ==== */
 AttributeSet eyeBlue    ("eyeBlue",     "Blue Eyes",   Rarity::UNCOMMON);
 AttributeSet eyeGreen   ("eyeGreen",    "Green Eyes",  Rarity::COMMON);
 AttributeSet eyeBrown   ("eyeBrown",    "Brown Eyes",  Rarity::COMMON);
-AttributeSet eyePurple  ("eyePurple",   "Purple Eyes", Rarity::VERY_RARE);
-AttributeSet eyeOrange  ("eyeOrange",   "Orange Eyes", Rarity::VERY_RARE);
-AttributeSet eyeRed     ("eyeRed",      "Red Eyes",    Rarity::LEGENDARY);
-AttributeSet eyeBlack   ("eyeBlack",    "Black Eyes",  Rarity::LEGENDARY);
+AttributeSet eyePurple  ("eyePurple",   "Purple Eyes", Rarity::RARE);
+AttributeSet eyeOrange  ("eyeOrange",   "Orange Eyes", Rarity::RARE);
+AttributeSet eyeRed     ("eyeRed",      "Red Eyes",    Rarity::VERY_RARE);
+AttributeSet eyeBlack   ("eyeBlack",    "Black Eyes",  Rarity::VERY_RARE);
+AttributeSet eyeOne     ("eyeOne",      "Cyclops",     Rarity::RARE);
+AttributeSet eyeThree   ("eyeThree",    "Three Eyes",  Rarity::RARE);
 
 /* ==== body ==== */
 AttributeSet darkSide   ("darkSide",    "Dark Side",   Rarity::RARE);
 AttributeSet slime      ("slime",       "Slime",       Rarity::RARE);
+AttributeSet bodyRed    ("bodyRed",     "Red",         Rarity::UNCOMMON);
+AttributeSet bodyYellow ("bodyYellow",  "Yellow",      Rarity::COMMON);
+AttributeSet pointy     ("pointy",      "Pointy",      Rarity::UNCOMMON);
+AttributeSet smooth     ("smooth",      "Smooth",      Rarity::UNCOMMON);
 
 std::vector<AttributeSet> attributeSets;
 int debugAttrIndex = 0;
@@ -29,7 +36,7 @@ static char *temp;
 
 static void initAttributeSets() {
     attributeSets = std::vector<AttributeSet>();
-    
+
     { // Defaults:
         // Square or round body.
         defaultSet.add(Attribute::BODY_SHAPE, Attribute::SET, Shape::SQUARE, 1, 1);
@@ -37,61 +44,123 @@ static void initAttributeSets() {
         // Two traditional eyes.
         defaultSet.add(Attribute::EYE_COUNT,  Attribute::SET, 2, 1, 1);
         defaultSet.add(Attribute::EYE_TYPE,   Attribute::SET, EyeType::TRADITIONAL, 1, 1);
-        
+
         // Basically any eye hue.
         defaultSet.add(Attribute::EYE_HUE,    Attribute::SET, 1, 1000, 1);
         // Mostly full eye saturation.
         defaultSet.add(Attribute::EYE_SAT,    Attribute::SET, 250, 10, 1);
         // Mostly full eye brightness.
         defaultSet.add(Attribute::EYE_BRI,    Attribute::SET, 190, 30, 1);
-        
+
         // Blueish body hue.
         defaultSet.add(Attribute::BODY_HUE,   Attribute::SET, 165, 30, 1);
         // Full body saturation.
         defaultSet.add(Attribute::BODY_SAT,   Attribute::SET, 255, 50, 1);
         // Mostly full body brightness.
         defaultSet.add(Attribute::BODY_BRI,   Attribute::SET, 230, 50, 1);
-        
+
         // Full alt saturation.
         defaultSet.add(Attribute::ALT_SAT,    Attribute::SET, 255, 50, 1);
         // Less alt brightness.
         defaultSet.add(Attribute::ALT_BRI,    Attribute::SET, 130, 30, 1);
     } // The default set always applies.
-    
+
     /* ==== eyes ==== */
-    
+
     { // Blue eyes.
         // Blue to cyan hue.
         eyeBlue.add(Attribute::EYE_HUE, Attribute::SET, 133, 5, 5);
-    attributeSets.push_back(eyeBlue);
+        // Mark exlusive with other colors.
+        eyeBlue.markExclusive(eyeGreen);
+        eyeBlue.markExclusive(eyeBrown);
+        eyeBlue.markExclusive(eyePurple);
+        eyeBlue.markExclusive(eyeOrange);
+        eyeBlue.markExclusive(eyeRed);
+        eyeBlue.markExclusive(eyeBlack);
     } // Uncommon set.
-    
+
     { // Brown eyes.
         eyeBrown.add(Attribute::EYE_HUE, Attribute::SET, 28, 5, 5);
         eyeBrown.add(Attribute::EYE_BRI, Attribute::SET, 90, 10, 5);
-    attributeSets.push_back(eyeBrown);
+        // Mark exlusive with other colors.
+        eyeBrown.markExclusive(eyeBlue);
+        eyeBrown.markExclusive(eyeGreen);
+        eyeBrown.markExclusive(eyePurple);
+        eyeBrown.markExclusive(eyeOrange);
+        eyeBrown.markExclusive(eyeRed);
+        eyeBrown.markExclusive(eyeBlack);
     } // Common set.
-    
+
     { // Green eyes.
         // Blue to cyan hue.
         eyeGreen.add(Attribute::EYE_HUE, Attribute::SET, 75, 5, 5);
-    attributeSets.push_back(eyeGreen);
+        // Mark exlusive with other colors.
+        eyeGreen.markExclusive(eyeBlue);
+        eyeGreen.markExclusive(eyeBrown);
+        eyeGreen.markExclusive(eyePurple);
+        eyeGreen.markExclusive(eyeOrange);
+        eyeGreen.markExclusive(eyeRed);
+        eyeGreen.markExclusive(eyeBlack);
     } // Uncommon set.
-    
+
     { // Purple eyes.
         eyePurple.add(Attribute::EYE_HUE, Attribute::SET, 194, 5, 5);
-    attributeSets.push_back(eyePurple);
+        // Mark exlusive with other colors.
+        eyePurple.markExclusive(eyeBlue);
+        eyePurple.markExclusive(eyeGreen);
+        eyePurple.markExclusive(eyeBrown);
+        eyePurple.markExclusive(eyeOrange);
+        eyePurple.markExclusive(eyeRed);
+        eyePurple.markExclusive(eyeBlack);
     } // Very rare set.
-    
+
     { // Orange eyes.
         eyeOrange.add(Attribute::EYE_HUE, Attribute::SET, 28, 5, 5);
-        eyeBrown.add(Attribute::EYE_BRI, Attribute::SET, 255, 5, 5);
-        eyeBrown.add(Attribute::EYE_SAT, Attribute::SET, 210, 5, 5);
-    attributeSets.push_back(eyeOrange);
+        eyeOrange.add(Attribute::EYE_BRI, Attribute::SET, 255, 5, 5);
+        eyeOrange.add(Attribute::EYE_SAT, Attribute::SET, 210, 5, 5);
+        // Mark exlusive with other colors.
+        eyeOrange.markExclusive(eyeBlue);
+        eyeOrange.markExclusive(eyeGreen);
+        eyeOrange.markExclusive(eyeBrown);
+        eyeOrange.markExclusive(eyePurple);
+        eyeOrange.markExclusive(eyeRed);
+        eyeOrange.markExclusive(eyeBlack);
     } // Very rare set.
-    
+
+    { // Red eyes.
+        eyeRed.add(Attribute::EYE_HUE, Attribute::SET, 0, 5, 5);
+        // Mark exlusive with other colors.
+        eyeRed.markExclusive(eyeBlue);
+        eyeRed.markExclusive(eyeGreen);
+        eyeRed.markExclusive(eyeBrown);
+        eyeRed.markExclusive(eyePurple);
+        eyeRed.markExclusive(eyeOrange);
+        eyeRed.markExclusive(eyeBlack);
+    } // Legendary set.
+
+    { // Black eyes.
+        eyeBlack.add(Attribute::EYE_BRI, Attribute::SET, 10, 5, 5);
+        eyeBlack.add(Attribute::EYE_SAT, Attribute::SET, 10, 5, 5);
+        // Mark exlusive with other colors.
+        eyeBlack.markExclusive(eyeBlue);
+        eyeBlack.markExclusive(eyeGreen);
+        eyeBlack.markExclusive(eyeBrown);
+        eyeBlack.markExclusive(eyePurple);
+        eyeBlack.markExclusive(eyeOrange);
+        eyeBlack.markExclusive(eyeRed);
+    } // Legendary set.
+
+    { // One eye.
+        eyeOne.add(Attribute::EYE_COUNT, Attribute::SET, 1, 1, 1);
+        eyeOne.markExclusive(eyeThree);
+    } // Very rare set.
+
+    { // Three eyes.
+        eyeThree.add(Attribute::EYE_COUNT, Attribute::SET, 3, 1, 1);
+    } // Very rare set.
+
     /* ==== body ==== */
-    
+
     { // Dark side.
         // Dark body.
         darkSide.add(Attribute::BODY_BRI,  Attribute::SET, 90, 7, 5);
@@ -103,9 +172,26 @@ static void initAttributeSets() {
         darkSide.add(Attribute::EYE_BRI,   Attribute::SET, 240, 50, 10);
         // Chance of dark eyes.
         darkSide.add(Attribute::EYE_TYPE,  Attribute::SET, EyeType::DARK, 1, 2);
-    attributeSets.push_back(darkSide);
+        // Incompatible with black eyes.
+        darkSide.markExclusive(eyeBlack);
     } // Rare set.
-    
+
+    { // Red body.
+        // Red body.
+        bodyRed.add(Attribute::BODY_HUE,  Attribute::SET, 3, 10, 5);
+        // Incompatible with other body colors.
+        bodyRed.markExclusive(bodyYellow);
+        bodyRed.markExclusive(slime);
+    } // Uncommon set.
+
+    { // Yellow body.
+        // Red body.
+        bodyYellow.add(Attribute::BODY_HUE,  Attribute::SET, 41, 1, 5);
+        // Incompatible with other body colors.
+        bodyYellow.markExclusive(bodyRed);
+        bodyYellow.markExclusive(slime);
+    } // Common set.
+
     { // Slime.
         // Tends to be green.
         slime.add(Attribute::BODY_HUE, Attribute::SET, 96, 5, 10);
@@ -121,23 +207,80 @@ static void initAttributeSets() {
         slime.markExclusive(eyeOrange);
         slime.markExclusive(eyeRed);
         slime.markExclusive(eyeBlack);
-    attributeSets.push_back(slime);
+        // Incompatible with other body colors.
+        slime.markExclusive(bodyYellow);
+        slime.markExclusive(bodyRed);
     } // Rare set.
+
+    { // Pointy.
+        // More square than not.
+        pointy.add(Attribute::BODY_SHAPE, Attribute::SET, Shape::SQUARE, 2, 2);
+        // Incompatible with smooth.
+        pointy.markExclusive(smooth);
+    } // Uncommon set.
+
+    { // Smooth.
+        // More round than not.
+        smooth.add(Attribute::BODY_SHAPE, Attribute::SET, Shape::CIRCLE, 2, 2);
+    } // Uncommon set.
     
+    
+    // I am very dumb.
+    attributeSets.push_back(eyeBlue);
+    attributeSets.push_back(eyeBrown);
+    attributeSets.push_back(eyeGreen);
+    attributeSets.push_back(eyePurple);
+    attributeSets.push_back(eyeOrange);
+    attributeSets.push_back(eyeRed);
+    attributeSets.push_back(eyeBlack);
+    attributeSets.push_back(eyeOne);
+    attributeSets.push_back(eyeThree);
+    attributeSets.push_back(darkSide);
+    attributeSets.push_back(bodyRed);
+    attributeSets.push_back(bodyYellow);
+    attributeSets.push_back(slime);
+    attributeSets.push_back(smooth);
+    attributeSets.push_back(pointy);
+}
+
+static const pax_vec1_t square_points[4] = {
+    {1,1}, {1,-1}, {-1,-1}, {-1,1},
+};
+
+static pax_vec1_t pentagon_points[5];
+static pax_vec1_t hexagon_points[6];
+static pax_vec1_t circle_points[32];
+
+static void vectorise_ngon(pax_vec1_t *out, int n_points) {
+    pax_vectorise_arc(
+        out, n_points, 0, 0, 1,
+        M_PI * -0.5 + M_PI / n_points,
+        M_PI * -0.5 + M_PI / n_points + M_PI * 2
+    );
+}
+
+static void precalculate() {
+    // The body shapes.
+    vectorise_ngon(pentagon_points, 5);
+    vectorise_ngon(hexagon_points, 6);
+    vectorise_ngon(circle_points, 32);
 }
 
 void graphics_init() {
+    // Allocate the text temporary buffer.
     temp = new char[temp_len];
-    
+
+    // Precaculate various things.
+    precalculate();
+
     // Init attribute sets before blob.
     initAttributeSets();
 }
 
 void graphics_task() {
     static bool hadCompanion = false;
-    static bool wasLoaded = false;
     pax_background(&buf, 0);
-    
+
     // Draw the AVATAARRRRR.
     if (hasCompanion && companionAgrees) {
         if (!hadCompanion) {
@@ -145,19 +288,18 @@ void graphics_task() {
             companion->blob->pos = Blob::Pos(buf.width*2/3, buf.height/2, 0);
             companion->blob->pos.animateTo(buf.width*2/3, buf.height/2, 35, 1000);
         }
-        
-        localPlayer->blob->draw();
-        companion->blob->draw();
+
+        localPlayer->blob->draw(localPlayer->getNick());
+        companion->blob->draw(companion->getNick());
         hadCompanion = true;
     } else {
         if (hadCompanion) {
             localPlayer->blob->pos.animateTo(buf.width/2, buf.height/2, 50, 1000);
         }
-        localPlayer->blob->draw();
+        localPlayer->blob->draw(localPlayer->getNick());
         hadCompanion = false;
-        wasLoaded = false;
     }
-    
+
     if (currentScreen == Screen::COMP_AWAIT) {
         // Asking companion: Show cancel option.
         pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Cancel");
@@ -181,28 +323,44 @@ void graphics_task() {
             snprintf(temp, temp_len, "🅴 %d people nearby", nearby);
             pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, temp);
         }
-    } else if (currentScreen == COMP_SELECT) {
+    } else if (currentScreen == Screen::COMP_SELECT) {
         // Draw a kinda crappy selection list.
         pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "↑↓Navigate 🅰Select 🅱Cancel");
         for (int i = 0; i < companionList.size(); i++) {
             pax_col_t col = i == companionListIndex ? 0xffffffff : 0xff9f9f9f;
             const char *str = connections[companionList[i]]->player->getNick();
-            pax_draw_text(&buf, col, pax_font_saira_regular, 18, 8, 25+18*i, str);
+            pax_draw_text(&buf, col, pax_font_saira_regular, 18, 28, 25+18*i, str);
+            col = connections[companionList[i]]->player->blob->bodyColor;
+            pax_draw_circle(&buf, col, 10, 34+18*i, i==companionListIndex ? 9 : 3);
         }
-        pax_draw_rect(&buf, 0xffffffff, 0, 31+18*companionListIndex, 6, 6);
+        // pax_draw_rect(&buf, 0xffffffff, 0, 31+18*companionListIndex, 6, 6);
     }
     
+    // Draw nearby players.
+    if (currentScreen != Screen::COMP_SELECT) {
+        float x = 10;
+        for (auto iter = connections.begin(); iter != connections.end(); iter++) {
+            Connection *conn = *iter;
+            if (conn && conn->player && conn != broadcaster && conn->status == Connection::OPEN && (conn->player != companion || !companionAgrees)) {
+                pax_draw_circle(&buf, conn->player->blob->bodyColor, x, 30, 9);
+                x += 20;
+            }
+        }
+    }
+    
+    #ifdef ENABLE_DEBUG
     // Debug menu.
     if (currentScreen == Screen::HOME) {
         for (int i = 0; i < attributeSets.size(); i++) {
             pax_col_t col = localPlayer->blob->findSet(attributeSets[i]) != -1
                         ? 0xff00ff00
                         : 0xff9f9f9f;
-            pax_draw_text(&buf, col, pax_font_saira_regular, 18, 8, 25+18*i, attributeSets[i].name);
+            pax_draw_text(&buf, col, pax_font_sky, 9, 8, 25+9*i, attributeSets[i].name);
         }
-        pax_draw_rect(&buf, 0xffffffff, 0, 31+18*debugAttrIndex, 6, 6);
+        pax_draw_rect(&buf, 0xffffffff, 0, 28+9*debugAttrIndex, 4, 4);
     }
-    
+    #endif
+
     disp_flush();
 }
 
@@ -229,7 +387,7 @@ AttributeSet *getSetById(const char *id) {
             return &*iter;
         }
     }
-    
+
     // Not found.
     return NULL;
 }
@@ -247,33 +405,33 @@ AttributeSet::AttributeSet(const char *netId, const char *name, Rarity Rarity) {
     this->netId = netId;
     this->name  = name;
     this->id    = id;
-    
+
     switch (Rarity) {
         case COMMON:
             this->mutationWeight = 10;
             this->initialWeight  = 50;
             break;
-            
+
         case UNCOMMON:
             this->mutationWeight = 5;
             this->initialWeight  = 10;
             break;
-            
+
         case RARE:
             this->mutationWeight = 3;
-            this->initialWeight  = 1;
+            this->initialWeight  = 5;
             break;
-            
+
         case VERY_RARE:
             this->mutationWeight = 2;
-            this->initialWeight  = 0;
+            this->initialWeight  = 1;
             break;
-            
+
         case LEGENDARY:
             this->mutationWeight = 1;
             this->initialWeight  = 0;
             break;
-            
+
         default:
         case UNOBTAINABLE:
             this->mutationWeight = 0;
@@ -284,7 +442,7 @@ AttributeSet::AttributeSet(const char *netId, const char *name, Rarity Rarity) {
 
 // Deconstructor.
 AttributeSet::~AttributeSet() {
-    
+
 }
 
 // Get the unique ID of the set.
@@ -307,8 +465,9 @@ bool AttributeSet::isExclusive(AttributeSet &other) {
     return exclusive.find(other.id) != exclusive.end();
 }
 
-// Make thie set mutually exclusive with another set.
+// Make this set mutually exclusive with another set.
 void AttributeSet::markExclusive(AttributeSet &other) {
+    if (other.id == this->id) return;
     exclusive.insert(other.id);
     other.exclusive.insert(this->id);
 }
@@ -337,14 +496,14 @@ static void draw_ngon(size_t num, pax_col_t bodyColor, pax_col_t altColor, float
     // Rotate such that the shape is flat at the bottom.
     pax_push_2d(&buf);
     pax_apply_2d(&buf, matrix_2d_rotate(M_PI/-2 + M_PI/num));
-    
+
     // Fix parameter range.
     num  ++;
     edge ++;
     // Start with a circle.
     pax_vec1_t points[num];
     pax_vectorise_circle(points, num, 0, 0, 1);
-    
+
     // Draw the outline.
     for (size_t i = 0; i < num; i++) {
         pax_vec1_t cur  = points[i];
@@ -373,13 +532,13 @@ static void draw_ngon(size_t num, pax_col_t bodyColor, pax_col_t altColor, float
             0,      0
         );
     }
-    
+
     // Restore transform.
     pax_pop_2d(&buf);
 }
 
 // Draw the blob.
-void Blob::draw() {
+void Blob::draw(const char *name) {
     float edge = 0.2;
     static int64_t nextRandom = 0;
     int64_t now = esp_timer_get_time() / 1000;
@@ -396,13 +555,13 @@ void Blob::draw() {
     if (now >= blinkTime + 300) {
         blinkTime = now + 4000 + (esp_random() / (float) UINT32_MAX * 3000.0);
     }
-    
+
     // Apply position and scale.
     pax_push_2d(&buf);
     pax_apply_2d(&buf, matrix_2d_translate(pos.x, pos.y));
     pax_apply_2d(&buf, matrix_2d_scale(pos.scale, pos.scale));
-    
-    
+
+
     switch (body) {
         default:
         case(SQUARE):
@@ -424,8 +583,8 @@ void Blob::draw() {
             pax_draw_circle(&buf, bodyColor, 0, 0, 1.1);
             break;
     }
-    
-    
+
+
     // Draw all arms.
     for (size_t i = 0; i < arms.size(); i++) {
         arms[i].timeAnimate(now);
@@ -436,19 +595,20 @@ void Blob::draw() {
         eyes[i].timeAnimate(now);
         eyes[i].drawAsEye(this);
     }
-    
+
     // Animate misc.
     mouthBias.timeAnimate(now);
     lookingAt.timeAnimate(now);
     pos.timeAnimate(now);
-    
-    
+
+
     // Position of mouth.
+    pax_push_2d(&buf);
     float mouthScaleY = 0.10;
     float mouthScaleX = mouthScaleY * (1 + 0.5 * fabsf(mouthBias.x));
     pax_apply_2d(&buf, matrix_2d_translate(mouth.x, mouth.y));
     pax_apply_2d(&buf, matrix_2d_scale(mouthScaleX, mouthScaleY));
-    
+
     // Draw mouth, but keep it convex.
     pax_vec1_t mouth[16];
     pax_vectorise_circle(mouth, 16, 0, 0, 1);
@@ -466,14 +626,105 @@ void Blob::draw() {
             mouth[i+1].x, mouth[i+1].y
         );
     }
+    pax_pop_2d(&buf);
     
+    // Draw the name.
+    // pax_vec1_t dims = pax_text_size(pax_font_saira_regular, 1, name);
+    pax_center_text(&buf, -1, pax_font_saira_regular, 18.0/50.0, 0, -1.5, name);
+
     // Restore transformation.
     pax_pop_2d(&buf);
 }
 
+// Interpolates X given Y on a line.
+static float linelerp(pax_vec1_t *line, float y) {
+    if (line[0].y < line[1].y) {
+        return line[0].x + (line[1].x-line[0].x)*(y-line[0].y)/(line[1].y-line[0].y);
+    } else {
+        return line[1].x + (line[0].x-line[1].x)*(y-line[1].y)/(line[0].y-line[1].y);
+    }
+}
+
 // Gets X counterpart for a given Y on the edge of the blob.
-float Blob::getEdgeX(float y, float angle) {
-    return 1;
+float Blob::getEdgeX(float y) {
+    int numToEval;
+    pax_vec1_t *points;
+    switch (body) {
+        default:
+        case(SQUARE):
+            // Square body.
+            return 1;
+        case(PENTAGON):
+            // Pentagonal body.
+            numToEval = 2;
+            points = pentagon_points;
+            break;
+        case(HEXAGON):
+            // Hexagonal body.
+            numToEval = 2;
+            points = hexagon_points;
+            break;
+        case(CIRCLE):
+            // Circular body.
+            numToEval = 16;
+            points = circle_points;
+            break;
+    }
+
+    // Find the right subdivision.
+    for (int i = 0; i < numToEval; i++) {
+        if (y >= points[i+1].y && y <= points[i].y) {
+            // And linearly interpolate the rest.
+            return linelerp(points+i, y);
+        }
+    }
+    return 0;
+}
+
+
+// Give initial attribute sets and apply them.
+void Blob::initialRandomise() {
+    // Pick a number of sets.
+    int numSets = 2 + esp_random() % 2U;
+    std::vector<AttributeSet> pool = attributeSets;
+    
+    // Continually pick a random set.
+    for (; pool.size() && numSets > 0; numSets --) {
+        
+        // Measure the pool.
+        float total = 0;
+        for (auto iter = pool.begin(); iter != pool.end(); iter++) {
+            total += iter->initialWeight;
+        }
+        
+        // Pick one set from the pool.
+        float coeff = esp_random() / (float) UINT32_MAX * total;
+        for (auto iter = pool.begin(); iter != pool.end(); iter++) {
+            coeff -= iter->initialWeight;
+            if (coeff <= 0) {
+                AttributeSet set = *iter;
+                
+                // Remove from the pool.
+                pool.erase(iter);
+                
+                // Eliminate incompatible sets from the pool.
+                for (auto iter1 = pool.begin(); iter1 != pool.end();) {
+                    if (set.isExclusive(*iter1)) {
+                        iter1 = pool.erase(iter1);
+                    } else {
+                        iter1 ++;
+                    }
+                }
+                
+                // Add it to the current sets.
+                attributes.push_back(set);
+                break;
+            }
+        }
+    }
+    
+    // Apply all attributes.
+    redoAttributes();
 }
 
 // Tests whether this blob has a given attribute set.
@@ -496,7 +747,7 @@ void Blob::toggleSet(AttributeSet &set) {
     } else {
         attributes.push_back(set);
     }
-    
+
     for (int i = 0; i < set.attributes.size(); i++) {
         changes.emplace(set.attributes[i].affects);
     }
@@ -508,7 +759,7 @@ void Blob::addSet(AttributeSet &set) {
     if (i == -1) {
         attributes.push_back(set);
     }
-    
+
     for (int i = 0; i < set.attributes.size(); i++) {
         changes.emplace(set.attributes[i].affects);
     }
@@ -517,12 +768,17 @@ void Blob::addSet(AttributeSet &set) {
 // Remove an attribute set.
 void Blob::removeSet(AttributeSet &set) {
     int i = findSet(set);
+    ESP_LOGW(TAG, "rm find %d", i);
     if (i != -1) {
+        ESP_LOGW(TAG, "rm name %s", set.name);
+        ESP_LOGW(TAG, "pre len %zu", attributes.size());
         attributes.erase(attributes.begin() + i);
-    }
-    
-    for (int i = 0; i < set.attributes.size(); i++) {
-        changes.emplace(set.attributes[i].affects);
+        ESP_LOGW(TAG, "rm len %zu", attributes.size());
+        
+        for (int i = 0; i < set.attributes.size(); i++) {
+            changes.emplace(set.attributes[i].affects);
+            ESP_LOGW(TAG, "+affect %d", set.attributes[i].affects);
+        }
     }
 }
 
@@ -537,11 +793,11 @@ void Blob::redoAttributes() {
 // Apply the blob's attributes, but only for changed affected variables.
 void Blob::applyAttributes() {
     int hue, sat, bri;
-    
+
     // Body shape.
     if (hasChanged(Attribute::BODY_SHAPE))
         body = (Shape) calculateAttribute(Attribute::BODY_SHAPE, Shape::SQUARE, Shape::CIRCLE);
-    
+
     // Body color.
     hue = calculateAttribute(Attribute::BODY_HUE, 0, 255);
     if (hasChanged(Attribute::BODY_HUE) || hasChanged(Attribute::BODY_SAT) || hasChanged(Attribute::BODY_BRI)) {
@@ -549,14 +805,14 @@ void Blob::applyAttributes() {
         bri = calculateAttribute(Attribute::BODY_BRI, 0, 255);
         bodyColor = pax_col_hsv(hue, sat, bri);
     }
-    
+
     // Alt color.
     if (hasChanged(Attribute::BODY_HUE) || hasChanged(Attribute::ALT_SAT) || hasChanged(Attribute::ALT_BRI)) {
         sat = calculateAttribute(Attribute::ALT_SAT, 0, 255);
         bri = calculateAttribute(Attribute::ALT_BRI, 0, 255);
         altColor = pax_col_hsv(hue, sat, bri);
     }
-    
+
     // Eye color.
     if (hasChanged(Attribute::EYE_HUE) || hasChanged(Attribute::EYE_SAT) || hasChanged(Attribute::EYE_BRI)) {
         hue = calculateAttribute(Attribute::EYE_HUE, 0, 255);
@@ -564,11 +820,35 @@ void Blob::applyAttributes() {
         bri = calculateAttribute(Attribute::EYE_BRI, 0, 255);
         eyeColor = pax_col_hsv(hue, sat, bri);
     }
-    
+
     // Eye type.
     if (hasChanged(Attribute::EYE_TYPE))
         eyeType = (EyeType) calculateAttribute(Attribute::EYE_TYPE, EyeType::TRADITIONAL, EyeType::CUTOUT);
-    
+
+    // Eye count.
+    if (hasChanged(Attribute::EYE_COUNT)) {
+        int eyeCount = calculateAttribute(Attribute::EYE_COUNT, 1, 3);
+
+        eyes.clear();
+        switch (eyeCount) {
+            case 1:
+                eyes.push_back(Pos(0, -0.5, 1.5));
+                break;
+
+            default:
+            case 2:
+                eyes.push_back(Pos(-0.4, -0.5));
+                eyes.push_back(Pos( 0.4, -0.5));
+                break;
+
+            case 3:
+                eyes.push_back(Pos(-0.45, -0.45));
+                eyes.push_back(Pos( 0,    -0.55));
+                eyes.push_back(Pos( 0.45, -0.45));
+                break;
+        }
+    }
+
     // Mark all as not changed.
     changes.clear();
 }
@@ -604,7 +884,7 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
     // Start all probabilities at 0.
     float *probabilities = new float[possible];
     for (int i = 0; i < possible; i++) probabilities[i] = 0;
-    
+
     // Set pass.
     bool needDefault = true;
     for (int x = 0; x < attributes.size(); x++) {
@@ -618,7 +898,7 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
             }
         }
     }
-    
+
     // Defaults pass.
     if (needDefault) {
         for (int i = 0; i < defaultSet.attributes.size(); i++) {
@@ -630,9 +910,9 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
             }
         }
     }
-    
+
     // TODO: Add pass.
-    
+
     // Forbid pass.
     for (int x = 0; x < attributes.size(); x++) {
         AttributeSet *set = &attributes[x];
@@ -644,7 +924,7 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
             }
         }
     }
-    
+
     // Find total probability.
     float total = 0;
     for (int i = 0; i < possible; i++) {
@@ -660,7 +940,7 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
             break;
         }
     }
-    
+
     // Clean up.
     delete probabilities;
     return value;
@@ -668,7 +948,15 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
 
 // Mutate with another blob.
 void Blob::mutate(Blob *with) {
-    // TODO: Remove own attr.
+    // Pick a number to remove.
+    float remFrac = 0.2 + esp_random() / (float) UINT32_MAX * 0.2;
+    int   rem     = ceilf(remFrac * attributes.size());
+    // Randomly remove attributes but never remove all.
+    while (rem && attributes.size() > 1) {
+        auto iter = attributes.begin() + (int) (esp_random() / (float) UINT32_MAX * attributes.size());
+        removeSet(*iter);
+        rem --;
+    }
     
     // Copy the attr. list.
     std::vector<AttributeSet> list = with->attributes;
@@ -684,15 +972,41 @@ void Blob::mutate(Blob *with) {
         }
     }
     
+    // Eliminate incompatible sets from the pool.
+    for (auto iter = attributes.begin(); iter != attributes.end(); iter++) {
+        AttributeSet set = *iter;
+        for (auto iter1 = list.begin(); iter1 != list.end();) {
+            if (set.isExclusive(*iter1)) {
+                iter1 = list.erase(iter1);
+            } else {
+                iter1 ++;
+            }
+        }
+    }
+    
     // Randomly pick a fraction of it's attributes.
-    float  maxFrac = 0.4;
-    size_t max = ceilf(list.size() * maxFrac);
+    float maxFrac = 0.2 + esp_random() / (float) UINT32_MAX * 0.2;
+    int   max = ceilf(list.size() * maxFrac);
+    ESP_LOGI(TAG, "Mutating against %d of %zu attributes", max, list.size());
     while (max && list.size()) {
-        auto iter = list.begin() + (esp_random() / (float) UINT32_MAX * list.size());
+        // Pick a random one.
+        auto iter = list.begin() + (int) (esp_random() / (float) UINT32_MAX * list.size());
+        AttributeSet set = *iter;
+        addSet(set);
         list.erase(iter);
-        addSet(*iter);
+        
+        // Eliminate incompatible sets from the pool.
+        for (auto iter1 = list.begin(); iter1 != list.end();) {
+            if (set.isExclusive(*iter1)) {
+                iter1 = list.erase(iter1);
+            } else {
+                iter1 ++;
+            }
+        }
         max --;
     }
+    
+    applyAttributes();
 }
 
 
@@ -723,44 +1037,46 @@ void Blob::send(Connection *to) {
         snprintf(temp, 32, "blob_attrs/%d", i);
         to->send(temp, attributes[i].netId);
     }
-    
+
     delete temp;
 }
 
 // Receive blob data from a given connection.
 void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) {
+    if (!strncmp(tmpTopic, "blob", 4)) ESP_LOGI(tmpTopic, "%s", tmpData);
+        
     if (!strcmp(tmpTopic, "blob_body")) {
         // Body shape thingy.
         body = (Shape) atoi(tmpData);
-        
+
     } else if (!strcmp(tmpTopic, "blob_body_col")) {
         // Body color thingy.
         bodyColor = atoi(tmpData);
-        
+
     } else if (!strcmp(tmpTopic, "blob_alt_col")) {
         // Edge color thingy.
         altColor = atoi(tmpData);
-        
+
     } else if (!strcmp(tmpTopic, "blob_looking")) {
         // Looking at direction.
         lookingAt = Pos(tmpData);
-        
+
     } else if (!strcmp(tmpTopic, "blob_mouth")) {
         // Mouth position.
         mouth = Pos(tmpData);
-        
+
     } else if (!strcmp(tmpTopic, "blob_mouth_bias")) {
         // Mouth bias.
         mouthBias = Pos(tmpData);
-        
+
     } else if (!strcmp(tmpTopic, "blob_eye_col")) {
         // Eye color.
         eyeColor = atoi(tmpData);
-        
+
     } else if (!strcmp(tmpTopic, "blob_eye_type")) {
         // Eye type.
         eyeType = (EyeType) atoi(tmpData);
-        
+
     } else if (!strcmp(tmpTopic, "blob_eye_count")) {
         // Double check count.
         int newSize = atoi(tmpData);
@@ -768,6 +1084,16 @@ void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) 
         // Resize array.
         while (eyes.size() > newSize) eyes.erase(eyes.begin() + newSize);
         while (eyes.size() < newSize) eyes.push_back(Pos());
+
+    } else if (!strncmp(tmpTopic, "blob_eye/", 9)) {
+        // Decode index.
+        int index = atoi(tmpTopic + 9);
+        if (index < 0 || index >= eyes.size()) {
+            ESP_LOGW(TAG, "Invalid index %d", index);
+        } else {
+            // Enforce index constraints.
+            eyes[index] = Pos(tmpData);
+        }
         
     } else if (!strcmp(tmpTopic, "blob_attrs_count")) {
         // Double check count.
@@ -776,7 +1102,7 @@ void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) 
         // Resize array.
         while (attributes.size() > newSize) attributes.erase(attributes.begin() + newSize);
         while (attributes.size() < newSize) attributes.push_back(AttributeSet());
-        
+
     } else if (!strncmp(tmpTopic, "blob_attrs/", 11)) {
         // Decode ID.
         AttributeSet *set = getSetById(tmpData);
@@ -784,6 +1110,8 @@ void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) 
             // Decode index.
             int index = atoi(tmpTopic + 11);
             if (index < 0 || index >= attributes.size()) {
+                ESP_LOGW(TAG, "Invalid index %d", index);
+            } else {
                 // Enforce index constraints.
                 attributes[index] = *set;
             }
@@ -818,11 +1146,23 @@ Blob::Pos::Pos(float sx, float sy, float ss) {
 // Position from data.
 Blob::Pos::Pos(const char *tmpData) {
     char *data = strdup(tmpData);
-    char *pos  = strchr(data, ',');
-    if (pos) {
-        *pos = 0;
+    char *pos0 = strchr(data, ',');
+    char *pos1 = strchr(pos0+1, ',');
+    if (pos0 && !pos1) {
+        *pos0 = 0;
         float sx = atoff(data);
-        float sy = atoff(pos+1);
+        float sy = atoff(pos0+1);
+        x  = sx; y  = sy;
+        x0 = sx; y0 = sy;
+        x1 = sx; y1 = sy;
+    } else if (pos0 && pos1) {
+        *pos0 = 0;
+        *pos1 = 0;
+        float sx = atoff(data);
+        float sy = atoff(pos0+1);
+        float ss = atoff(pos1+1);
+        scale = ss;
+        s0 = ss; s1 = ss;
         x  = sx; y  = sy;
         x0 = sx; y0 = sy;
         x1 = sx; y1 = sy;
@@ -878,42 +1218,42 @@ void Blob::Pos::send(Connection *to, const char *topic) {
     // Allocate some memory.
     char *temp       = new char[Connection_BUF_LEN];
     // Adjust animation times.
-    int64_t now      = esp_timer_get_time() / 1000;
-    int64_t startAlt = start - now;
-    int64_t endAlt   = end   - now;
+    // int64_t now      = esp_timer_get_time() / 1000;
+    // int64_t startAlt = start - now;
+    // int64_t endAlt   = end   - now;
     // Format and send it!
-    snprintf(temp, 32, "%f,%f", x1, y1);
+    snprintf(temp, 32, "%f,%f,%f", x1, y1, s1);
     to->send(topic, temp);
-    
+
     delete temp;
 }
 
 
 // Internal arm drawing method.
 void Blob::Pos::drawAsArm(Blob *blob) {
-    
+
 }
 
 // Internal eye drawing method.
 void Blob::Pos::drawAsEye(Blob *blob) {
     int64_t now = esp_timer_get_time() / 1000;
     int64_t blinkLength = 150;
-    float scale  = 0.2;
+    float scale  = 0.2 * this->scale;
     float lookX  = blob->lookingAt.x;
     float lookY  = blob->lookingAt.y;
-    
+
     // Apply position and scale.
     pax_push_2d(&buf);
     pax_apply_2d(&buf, matrix_2d_translate(x, y));
     pax_apply_2d(&buf, matrix_2d_scale(scale, scale));
-    
+
     // Apply blinking.
     if (now >= blob->blinkTime - blinkLength && now <= blob->blinkTime + blinkLength) {
         float blink = fabsf((blob->blinkTime - now) / (float) blinkLength);
         blink *= blink * blink;
         pax_apply_2d(&buf, matrix_2d_scale(1, blink));
     }
-    
+
     switch (blob->eyeType) {
         default:
         case(EyeType::TRADITIONAL):
@@ -931,7 +1271,7 @@ void Blob::Pos::drawAsEye(Blob *blob) {
             pax_draw_circle(&buf, blob->altColor, lookX*0.3, lookY*0.3, 1);
             break;
     }
-    
+
     // Restore transformation.
     pax_pop_2d(&buf);
 }

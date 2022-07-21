@@ -14,7 +14,8 @@ typedef union {
     uint64_t pack;
 } mac_t;
 std::map<uint64_t, Connection *> espnowConnMap;
-static Connection *broadcaster;
+Connection *broadcaster;
+static std::vector<std::pair<Connection *, std::string>> cache;
 
 static const uint8_t magic[] = {
     0xde, 0xad, 0xbe, 0xef,
@@ -91,6 +92,18 @@ void espnow_broadcast_float(const char *topic, float number) {
     broadcaster->send(topic, temp);
 }
 
+void espnow_run_callbacks() {
+    for (auto iter = cache.begin(); iter != cache.end();) {
+        Connection *conn = iter->first;
+        std::string data = iter->second;
+        
+        // Handle data on it.
+        conn->onData(data.c_str(), data.length());
+        // Dequeue from LIST.
+        iter = cache.erase(iter);
+    }
+}
+
 void espnowRecvCallback(const uint8_t *mac_addr, const uint8_t *data, int data_len) {
     if (data_len < sizeof(magic) || memcmp(data, magic, sizeof(magic))) {
         // This is not data for me.
@@ -121,8 +134,13 @@ void espnowRecvCallback(const uint8_t *mac_addr, const uint8_t *data, int data_l
         // Set it open.
         conn->setStatus(Connection::OPEN);
     }
-    // Handle data on it.
-    conn->onData(&data[sizeof(magic)], data_len - sizeof(magic));
+    // Add it to cache.
+    cache.push_back(
+        std::pair<Connection *, std::string>(
+            conn,
+            std::string((const char *) &data[sizeof(magic)], data_len - sizeof(magic))
+        )
+    );
 }
 
 void espnowSendCallback(Connection *from, const char *msg) {

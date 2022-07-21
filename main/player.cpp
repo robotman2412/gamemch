@@ -48,11 +48,13 @@ Player *loadFromNvs() {
     // Allocate memory for nickname.
     size_t required = 0;
     nvs_get_str(nick_handle, "nickname", NULL, &required);
+    if (required < 32) required = 32;
     char *nick = new char[required];
     *nick = 0;
     // Read nickname.
     nvs_get_str(nick_handle, "nickname", nick, &required);
     nvs_close(nick_handle);
+    if (!*nick) strcpy(nick, "Anonymous");
     
     // Open NVS to read player data.
     nvs_handle_t local_handle;
@@ -70,7 +72,7 @@ Player *loadFromNvs() {
     
     // Set the BLOB.
     player->blob = new Blob();
-    player->blob->redoAttributes();
+    player->blob->initialRandomise();
     
     // Clean up.
     delete nick;

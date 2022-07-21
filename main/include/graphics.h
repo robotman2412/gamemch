@@ -108,6 +108,8 @@ class AttributeSet {
         uint32_t id;
         // Mutually exclusive with.
         std::set<uint32_t> exclusive;
+        // Prerequisites that must be present first.
+        std::set<uint32_t> prerequisite;
     public:
         // The name of this set.
         const char *name;
@@ -132,7 +134,7 @@ class AttributeSet {
         uint32_t getId();
         // Test whether a set is mutually exclusive with this one.
         bool isExclusive(AttributeSet &other);
-        // Make thie set mutually exclusive with another set.
+        // Make this set mutually exclusive with another set.
         void markExclusive(AttributeSet &other);
         // Add an attribute to the set.
         void add(Attribute toAdd);
@@ -225,10 +227,12 @@ class Blob {
         Blob();
         
         // Draw the blob.
-        void draw();
+        void draw(const char *name);
         // Gets X counterpart for a given Y on the edge of the blob.
-        float getEdgeX(float y, float angle);
+        float getEdgeX(float y);
         
+        // Give initial attribute sets and apply them.
+        void initialRandomise();
         // Tests whether this blob has a given attribute set.
         // If so, returns the index.
         // If not, returns -1.

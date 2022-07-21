@@ -69,6 +69,7 @@ extern "C" void app_main() {
     currentScreen = Screen::HOME;
     
     while (1) {
+        espnow_run_callbacks();
         if (currentScreen == Screen::COMP_SELECT) {
             refreshCompanionList();
         }
@@ -149,11 +150,18 @@ extern "C" void app_main() {
                     localPlayer->blob->send(companion->connection);
                 }
                 
-            } else if (message.input == RP2040_INPUT_BUTTON_MENU && message.state && hasCompanion) {
-                // Debug: Do the mutator.
-                localPlayer->blob->mutate(companion->blob);
-                localPlayer->blob->applyAttributes();
-                localPlayer->blob->send(companion->connection);
+            } else if (message.input == RP2040_INPUT_BUTTON_MENU && message.state) {
+                if (hasCompanion) {
+                    // Debug: Do the mutator.
+                    ESP_LOGI(TAG, "Mutating with companion");
+                    localPlayer->blob->mutate(companion->blob);
+                    localPlayer->blob->send(companion->connection);
+                } else {
+                    // Debug: Randomise again the attributes.
+                    ESP_LOGI(TAG, "Randomising");
+                    localPlayer->blob->attributes.clear();
+                    localPlayer->blob->initialRandomise();
+                }
                 
             }
         }
@@ -162,11 +170,11 @@ extern "C" void app_main() {
 
 
 
-// Broadcast info obout ourselves.
+// Broadcast info about ourselves.
 void broadcastInfo() {
     // Advertise our presence by broadcasting our nickname and score.
-    espnow_broadcast("nick",      localPlayer->getNick());
-    espnow_broadcast_num("score", localPlayer->getScore());
+    espnow_broadcast("nick",              localPlayer->getNick());
+    espnow_broadcast_num("blob_body_col", localPlayer->blob->bodyColor);
 }
 
 // Ask a connection as companion.
