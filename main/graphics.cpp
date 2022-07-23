@@ -29,6 +29,11 @@ AttributeSet bodyYellow ("bodyYellow",  "Yellow",      Rarity::COMMON);
 AttributeSet pointy     ("pointy",      "Pointy",      Rarity::UNCOMMON);
 AttributeSet smooth     ("smooth",      "Smooth",      Rarity::UNCOMMON);
 
+/* ==== resources ==== */
+extern uint8_t pattern0_start[] asm("_binary_pattern0_png_start");
+extern uint8_t pattern0_end[]   asm("_binary_pattern0_png_end");
+pax_buf_t pattern0;
+
 std::vector<AttributeSet> attributeSets;
 int debugAttrIndex = 0;
 static const size_t temp_len = 1024;
@@ -275,12 +280,25 @@ void graphics_init() {
 
     // Init attribute sets before blob.
     initAttributeSets();
+    
+    // Load resources.
+    if (!pax_decode_png_buf(&pattern0, pattern0_start, pattern0_end-pattern0_start, PAX_BUF_16_4444ARGB, CODEC_FLAG_OPTIMAL)) {
+        ESP_LOGE(TAG, "Failed to load pattern0.png");
+        exit_to_launcher();
+    }
 }
 
 void graphics_task() {
     static bool hadCompanion = false;
     pax_background(&buf, 0);
-
+    
+    if (currentScreen == Screen::MUTATE_PICK) {
+        // Draw the mutation pick screen thing.
+        for (auto iter = candidates.begin(); iter != candidates.end(); iter++) {
+            iter->draw("");
+        }
+    }
+    
     // Draw the AVATAARRRRR.
     if (hasCompanion && companionAgrees) {
         if (!hadCompanion) {
@@ -288,7 +306,7 @@ void graphics_task() {
             companion->blob->pos = Blob::Pos(buf.width*2/3, buf.height/2, 0);
             companion->blob->pos.animateTo(buf.width*2/3, buf.height/2, 35, 1000);
         }
-
+        
         localPlayer->blob->draw(localPlayer->getNick());
         companion->blob->draw(companion->getNick());
         hadCompanion = true;
@@ -299,8 +317,19 @@ void graphics_task() {
         localPlayer->blob->draw(localPlayer->getNick());
         hadCompanion = false;
     }
-
-    if (currentScreen == Screen::COMP_AWAIT) {
+    
+    if (currentScreen == Screen::INTRO) {
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "↑↓Read 🆂Done");
+        
+        pax_clip(&buf, 0, 25, 320, 240-25);
+        float scrollFac = pax_text_size(pax_font_saira_regular, 18, introText).y - 240 + 55;
+        scrollFac *= introScroll;
+        
+        pax_center_text(&buf, -1, pax_font_saira_condensed, 30, 320*0.5, 25-scrollFac, introTitle);
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 55-scrollFac, introText);
+        
+        pax_noclip(&buf);
+    } else if (currentScreen == Screen::COMP_AWAIT) {
         // Asking companion: Show cancel option.
         pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Cancel");
         // Also show a little overlay.
@@ -311,7 +340,7 @@ void graphics_task() {
     } else if (currentScreen == Screen::HOME) {
         if (hasCompanion) {
             // Have companion; show leave option.
-            pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🅱 Leave");
+            pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "🆂Cross 🅱Leave");
         } else if (!nearby) {
             // Nobody detected.
             pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "Nobody nearby");
@@ -334,10 +363,15 @@ void graphics_task() {
             pax_draw_circle(&buf, col, 10, 34+18*i, i==companionListIndex ? 9 : 3);
         }
         // pax_draw_rect(&buf, 0xffffffff, 0, 31+18*companionListIndex, 6, 6);
+    } else if (currentScreen == Screen::MUTATE_PICK) {
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, "←→Select 🅰Accept");
+    } else if (currentScreen == Screen::MUTATE_AWAIT) {
+        snprintf(temp, temp_len, "Waiting for %s...", companion->getNick());
+        pax_draw_text(&buf, -1, pax_font_saira_regular, 18, 5, 5, temp);
     }
     
     // Draw nearby players.
-    if (currentScreen != Screen::COMP_SELECT) {
+    if (currentScreen != Screen::COMP_SELECT && currentScreen != Screen::INTRO) {
         float x = 10;
         for (auto iter = connections.begin(); iter != connections.end(); iter++) {
             Connection *conn = *iter;
@@ -360,7 +394,24 @@ void graphics_task() {
         pax_draw_rect(&buf, 0xffffffff, 0, 28+9*debugAttrIndex, 4, 4);
     }
     #endif
-
+    
+    // Draw version warnings.
+    #ifdef ENABLE_DEBUG
+    if (hasCompanion && (companion->version != GAME_VERSION || !companion->versionDebug)) {
+        bool compNewer = companion->version > GAME_VERSION || (companion->version == GAME_VERSION && !companion->versionDebug);
+    #else
+    if (hasCompanion && (companion->version != GAME_VERSION || companion->versionDebug)) {
+        bool compNewer = companion->version > GAME_VERSION;
+    #endif
+        if (compNewer) {
+            snprintf(temp, temp_len, "%s has newer version %s\n(you are on %s)", companion->getNick(), companion->verStr, localPlayer->verStr);
+        } else {
+            snprintf(temp, temp_len, "%s has older version %s\n(you are on %s)", companion->getNick(), companion->verStr, localPlayer->verStr);
+        }
+        pax_vec1_t dims = pax_text_size(pax_font_sky, 9, temp);
+        pax_draw_text(&buf, 0xffff7f00, pax_font_sky, 9, 320-5-dims.x, 240-5-dims.y, temp);
+    }
+    
     disp_flush();
 }
 
@@ -408,27 +459,27 @@ AttributeSet::AttributeSet(const char *netId, const char *name, Rarity Rarity) {
 
     switch (Rarity) {
         case COMMON:
-            this->mutationWeight = 10;
+            this->mutationWeight = 1;
             this->initialWeight  = 50;
             break;
 
         case UNCOMMON:
-            this->mutationWeight = 5;
+            this->mutationWeight = 1;
             this->initialWeight  = 10;
             break;
 
         case RARE:
-            this->mutationWeight = 3;
+            this->mutationWeight = 5;
             this->initialWeight  = 5;
             break;
 
         case VERY_RARE:
-            this->mutationWeight = 2;
+            this->mutationWeight = 5;
             this->initialWeight  = 1;
             break;
 
         case LEGENDARY:
-            this->mutationWeight = 1;
+            this->mutationWeight = 3;
             this->initialWeight  = 0;
             break;
 
@@ -462,14 +513,22 @@ void AttributeSet::add(Attribute::Affects affects, Attribute::Mode mode, float v
 
 // Test whether a set is mutually exclusive with this one.
 bool AttributeSet::isExclusive(AttributeSet &other) {
-    return exclusive.find(other.id) != exclusive.end();
+    for (auto iter = exclusive.begin(); iter != exclusive.end(); iter++) {
+        printf(" %d", *iter);
+        if (*iter == other.id) {
+            return true;
+        }
+    }
+    // return exclusive.find(other.id) != exclusive.end();
+    return false;
 }
 
 // Make this set mutually exclusive with another set.
 void AttributeSet::markExclusive(AttributeSet &other) {
-    if (other.id == this->id) return;
-    exclusive.insert(other.id);
-    other.exclusive.insert(this->id);
+    if (other.id == id) return;
+    ESP_LOGW(TAG, "Mark %s(%d) excl %s(%d)", name, id, other.name, other.id);
+    exclusive.emplace(other.id);
+    other.exclusive.emplace(id);
 }
 
 
@@ -489,6 +548,8 @@ Blob::Blob() {
     lookingAt = Pos();
     pos       = Pos(buf.width/2.0, buf.height/2.0, 50);
     blinkTime = 0;
+    sickness  = 0;
+    redoAll   = false;
 }
 
 // Draws an n-gon based on a circle.
@@ -555,19 +616,35 @@ void Blob::draw(const char *name) {
     if (now >= blinkTime + 300) {
         blinkTime = now + 4000 + (esp_random() / (float) UINT32_MAX * 3000.0);
     }
-
+    
     // Apply position and scale.
     pax_push_2d(&buf);
     pax_apply_2d(&buf, matrix_2d_translate(pos.x, pos.y));
     pax_apply_2d(&buf, matrix_2d_scale(pos.scale, pos.scale));
-
-
+    
+    // Apply sickness.
+    pax_push_2d(&buf);
+    pax_apply_2d(&buf, matrix_2d_shear(0, sickness*0.3));
+    pax_apply_2d(&buf, matrix_2d_scale(1+sickness*0.2, 1));
+    
+    
+    pax_quad_t uvs = {
+        .x0 = 0, .y0 = 0,
+        .x1 = 9, .y1 = 0,
+        .x2 = 9, .y2 = 9,
+        .x3 = 0, .y3 = 9,
+    };
+    pax_shader_t shader = PAX_SHADER_TEXTURE(&pattern0);
     switch (body) {
         default:
         case(SQUARE):
             // Square body.
             pax_draw_rect(&buf, altColor,  -1, -1, 2, 2);
-            pax_draw_rect(&buf, bodyColor, edge-1, edge-1, 2-2*edge, 2-2*edge);
+            pax_shade_rect(
+                &buf, bodyColor,
+                &shader, &uvs,
+                edge-1, edge-1, 2-2*edge, 2-2*edge
+            );
             break;
         case(PENTAGON):
             // Pentagonal body.
@@ -583,8 +660,8 @@ void Blob::draw(const char *name) {
             pax_draw_circle(&buf, bodyColor, 0, 0, 1.1);
             break;
     }
-
-
+    
+    
     // Draw all arms.
     for (size_t i = 0; i < arms.size(); i++) {
         arms[i].timeAnimate(now);
@@ -608,6 +685,8 @@ void Blob::draw(const char *name) {
     float mouthScaleX = mouthScaleY * (1 + 0.5 * fabsf(mouthBias.x));
     pax_apply_2d(&buf, matrix_2d_translate(mouth.x, mouth.y));
     pax_apply_2d(&buf, matrix_2d_scale(mouthScaleX, mouthScaleY));
+    // Apply sickness.
+    pax_apply_2d(&buf, matrix_2d_translate(sickness, sickness*0.2));
 
     // Draw mouth, but keep it convex.
     pax_vec1_t mouth[16];
@@ -629,7 +708,7 @@ void Blob::draw(const char *name) {
     pax_pop_2d(&buf);
     
     // Draw the name.
-    // pax_vec1_t dims = pax_text_size(pax_font_saira_regular, 1, name);
+    pax_pop_2d(&buf);
     pax_center_text(&buf, -1, pax_font_saira_regular, 18.0/50.0, 0, -1.5, name);
 
     // Restore transformation.
@@ -708,11 +787,11 @@ void Blob::initialRandomise() {
                 pool.erase(iter);
                 
                 // Eliminate incompatible sets from the pool.
-                for (auto iter1 = pool.begin(); iter1 != pool.end();) {
-                    if (set.isExclusive(*iter1)) {
-                        iter1 = pool.erase(iter1);
+                for (auto y = pool.begin(); y != pool.end();) {
+                    if (set.isExclusive(*y)) {
+                        y = pool.erase(y);
                     } else {
-                        iter1 ++;
+                        y ++;
                     }
                 }
                 
@@ -768,36 +847,34 @@ void Blob::addSet(AttributeSet &set) {
 // Remove an attribute set.
 void Blob::removeSet(AttributeSet &set) {
     int i = findSet(set);
-    ESP_LOGW(TAG, "rm find %d", i);
+    // ESP_LOGW(TAG, "rm find %d", i);
     if (i != -1) {
         ESP_LOGW(TAG, "rm name %s", set.name);
-        ESP_LOGW(TAG, "pre len %zu", attributes.size());
+        // ESP_LOGW(TAG, "pre len %zu", attributes.size());
         attributes.erase(attributes.begin() + i);
-        ESP_LOGW(TAG, "rm len %zu", attributes.size());
+        // ESP_LOGW(TAG, "rm len %zu", attributes.size());
         
         for (int i = 0; i < set.attributes.size(); i++) {
             changes.emplace(set.attributes[i].affects);
-            ESP_LOGW(TAG, "+affect %d", set.attributes[i].affects);
+            // ESP_LOGW(TAG, "+affect %d", set.attributes[i].affects);
         }
     }
 }
 
 // Apply the blob's attributes from scratch.
 void Blob::redoAttributes() {
-    for (int i = 0; i < Attribute::Affects::NUMBER; i++) {
-        changes.emplace((Attribute::Affects) i);
-    }
+    redoAll = true;
     applyAttributes();
 }
 
 // Apply the blob's attributes, but only for changed affected variables.
 void Blob::applyAttributes() {
     int hue, sat, bri;
-
+    
     // Body shape.
     if (hasChanged(Attribute::BODY_SHAPE))
         body = (Shape) calculateAttribute(Attribute::BODY_SHAPE, Shape::SQUARE, Shape::CIRCLE);
-
+    
     // Body color.
     hue = calculateAttribute(Attribute::BODY_HUE, 0, 255);
     if (hasChanged(Attribute::BODY_HUE) || hasChanged(Attribute::BODY_SAT) || hasChanged(Attribute::BODY_BRI)) {
@@ -805,14 +882,14 @@ void Blob::applyAttributes() {
         bri = calculateAttribute(Attribute::BODY_BRI, 0, 255);
         bodyColor = pax_col_hsv(hue, sat, bri);
     }
-
+    
     // Alt color.
     if (hasChanged(Attribute::BODY_HUE) || hasChanged(Attribute::ALT_SAT) || hasChanged(Attribute::ALT_BRI)) {
         sat = calculateAttribute(Attribute::ALT_SAT, 0, 255);
         bri = calculateAttribute(Attribute::ALT_BRI, 0, 255);
         altColor = pax_col_hsv(hue, sat, bri);
     }
-
+    
     // Eye color.
     if (hasChanged(Attribute::EYE_HUE) || hasChanged(Attribute::EYE_SAT) || hasChanged(Attribute::EYE_BRI)) {
         hue = calculateAttribute(Attribute::EYE_HUE, 0, 255);
@@ -820,15 +897,15 @@ void Blob::applyAttributes() {
         bri = calculateAttribute(Attribute::EYE_BRI, 0, 255);
         eyeColor = pax_col_hsv(hue, sat, bri);
     }
-
+    
     // Eye type.
     if (hasChanged(Attribute::EYE_TYPE))
         eyeType = (EyeType) calculateAttribute(Attribute::EYE_TYPE, EyeType::TRADITIONAL, EyeType::CUTOUT);
-
+    
     // Eye count.
     if (hasChanged(Attribute::EYE_COUNT)) {
         int eyeCount = calculateAttribute(Attribute::EYE_COUNT, 1, 3);
-
+        
         eyes.clear();
         switch (eyeCount) {
             case 1:
@@ -848,14 +925,15 @@ void Blob::applyAttributes() {
                 break;
         }
     }
-
+    
     // Mark all as not changed.
     changes.clear();
+    redoAll = false;
 }
 
 // Tests whether an attribute has changed.
 bool Blob::hasChanged(Attribute::Affects affected) {
-    return changes.find(affected) != changes.end();
+    return redoAll || changes.find(affected) != changes.end();
 }
 
 // Adds a curve to the probabilities list.
@@ -948,8 +1026,48 @@ int Blob::calculateAttribute(Attribute::Affects affects, int min, int max) {
 
 // Mutate with another blob.
 void Blob::mutate(Blob *with) {
+    // Determine sickness.
+    sickness = fabsf(sickness);
+    int attrCommon = 0, attrLocal = 0, attrRemote = 0;
+    // Determine common and local attributes.
+    for (auto iter = attributes.begin(); iter != attributes.end();) {
+        for (auto y = with->attributes.begin(); y != with->attributes.end(); y++) {
+            if (!strcmp(iter->netId, y->netId)) {
+                attrCommon ++;
+                goto yeems0;
+            }
+        }
+        attrLocal++;
+        yeems0:
+        iter++;
+    }
+    // Determine remote attributes.
+    for (auto iter = with->attributes.begin(); iter != with->attributes.end();) {
+        for (auto y = attributes.begin(); y != attributes.end(); y++) {
+            if (!strcmp(iter->netId, y->netId)) {
+                goto yeems1;
+            }
+        }
+        attrRemote++;
+        yeems1:
+        iter++;
+    }
+    // Sickness DELTA.
+    int attrDiff = attrLocal + attrRemote;
+    float sicknessChance = (float) attrCommon / (float) (attrDiff + 0.3);
+    if (esp_random() / (float) UINT32_MAX < sicknessChance) {
+        sickness += 0.1;
+        if (sickness > 1.5) sickness = 1;
+    } else if (esp_random() / (float) UINT32_MAX < 0.3) {
+        sickness -= 0.1;
+        if (sickness < 0) sickness = 0;
+    }
+    if (esp_random() & 1) {
+        sickness = -sickness;
+    }
+    
     // Pick a number to remove.
-    float remFrac = 0.2 + esp_random() / (float) UINT32_MAX * 0.2;
+    float remFrac = 0.3 + esp_random() / (float) UINT32_MAX * 0.3;
     int   rem     = ceilf(remFrac * attributes.size());
     // Randomly remove attributes but never remove all.
     while (rem && attributes.size() > 1) {
@@ -975,11 +1093,11 @@ void Blob::mutate(Blob *with) {
     // Eliminate incompatible sets from the pool.
     for (auto iter = attributes.begin(); iter != attributes.end(); iter++) {
         AttributeSet set = *iter;
-        for (auto iter1 = list.begin(); iter1 != list.end();) {
-            if (set.isExclusive(*iter1)) {
-                iter1 = list.erase(iter1);
+        for (auto y = list.begin(); y != list.end();) {
+            if (set.isExclusive(*y) || !strcmp(set.netId, y->netId)) {
+                y = list.erase(y);
             } else {
-                iter1 ++;
+                y ++;
             }
         }
     }
@@ -996,17 +1114,57 @@ void Blob::mutate(Blob *with) {
         list.erase(iter);
         
         // Eliminate incompatible sets from the pool.
-        for (auto iter1 = list.begin(); iter1 != list.end();) {
-            if (set.isExclusive(*iter1)) {
-                iter1 = list.erase(iter1);
+        for (auto y = list.begin(); y != list.end();) {
+            if (set.isExclusive(*y)) {
+                y = list.erase(y);
             } else {
-                iter1 ++;
+                y ++;
             }
         }
         max --;
     }
     
-    applyAttributes();
+    // Chance to mutate in another new gene.
+    float extraChance = fabsf(sickness);
+    bool c0 = esp_random() / (float) UINT32_MAX < extraChance;
+    if (attributes.size() <= 2) c0 = true;
+    bool c1 = list.size() > 0;
+    if (c0 && c1) {
+        // Measure the total weight before weighted random.
+        float total = 0;
+        for (auto iter = list.begin(); iter != list.end(); iter++) {
+            total += iter->mutationWeight;
+        }
+        // Pick a weighted random one.
+        float coeff = esp_random() / (float) UINT32_MAX * total;
+        for (auto iter = list.begin(); iter != list.end(); iter++) {
+            coeff -= iter->mutationWeight;
+            if (coeff <= 0) {
+                // The result was picked, add it and finish.
+                addSet(*iter);
+                break;
+            }
+        }
+    }
+    
+    redoAttributes();
+}
+
+
+// Whether this blob has the same attribute sets as another.
+bool Blob::setsEquals(Blob &other) {
+    if (attributes.size() != other.attributes.size()) return false;
+    
+    for (auto iter = attributes.begin(); iter != attributes.end();) {
+        for (auto y = other.attributes.begin(); y != other.attributes.end(); y++) {
+            if (!strcmp(iter->netId, y->netId)) goto yesh;
+        }
+        return false;
+        yesh:
+        iter++;
+    }
+    
+    return true;
 }
 
 
@@ -1037,6 +1195,8 @@ void Blob::send(Connection *to) {
         snprintf(temp, 32, "blob_attrs/%d", i);
         to->send(temp, attributes[i].netId);
     }
+    // Send sickness.
+    to->sendNum("blob_sickness", sickness*65536);
 
     delete temp;
 }
@@ -1045,7 +1205,11 @@ void Blob::send(Connection *to) {
 void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) {
     if (!strncmp(tmpTopic, "blob", 4)) ESP_LOGI(tmpTopic, "%s", tmpData);
         
-    if (!strcmp(tmpTopic, "blob_body")) {
+    if (!strcmp(tmpTopic, "blob_sickness")) {
+        // Sickness.
+        sickness = atoi(tmpData) / (float) 65536;
+        
+    } else if (!strcmp(tmpTopic, "blob_body")) {
         // Body shape thingy.
         body = (Shape) atoi(tmpData);
 
@@ -1122,6 +1286,48 @@ void Blob::receive(Connection *from, const char *tmpTopic, const char *tmpData) 
     }
 }
 
+// Stores the blob to NVS.
+void Blob::storeToNvs() {
+    char *temp = new char[32+32*attributes.size()];
+    
+    // Open NVS.
+    nvs_handle_t handle = 0;
+    esp_err_t res = nvs_open(GAME_NVS_NAME, NVS_READWRITE, &handle);
+    if (res) ESP_LOGE(TAG, "Error storing blob: %s", esp_err_to_name(res));
+    
+    // Save colors.
+    nvs_set_u32(handle, "blob_body_col", bodyColor);
+    nvs_set_u32(handle, "blob_alt_col",  altColor);
+    nvs_set_u32(handle, "blob_eye_col",  eyeColor);
+    // Save eyes.
+    nvs_set_u32(handle, "blob_eye_type", (int) eyeType);
+    nvs_set_u32(handle, "blob_eye_count", eyes.size());
+    // for (int i = 0; i < eyes.size(); i++) {
+    //     snprintf(temp, 32, "blob_eye/%d", i);
+    //     eyes[i].send(to, temp);
+    // }
+    // Save body type.
+    nvs_set_u32(handle, "blob_body", (int) body);
+    // Save attributes.
+    *temp = 0;
+    for (int i = 0; i < attributes.size(); i++) {
+        if (i) strcat(temp, ",");
+        strcat(temp, attributes[i].netId);
+    }
+    nvs_set_str(handle, "blob_attrs", temp);
+    // Save sickness.
+    nvs_set_u32(handle, "blob_sickness", sickness*65536);
+    
+    // Close NVS.
+    nvs_close(handle);
+    
+    delete temp;
+}
+
+// Loads the blob from NVS.
+void Blob::loadFromNvs() {
+    esp_err_t res = 0;
+}
 
 // Origin position.
 Blob::Pos::Pos() {
@@ -1246,6 +1452,10 @@ void Blob::Pos::drawAsEye(Blob *blob) {
     pax_push_2d(&buf);
     pax_apply_2d(&buf, matrix_2d_translate(x, y));
     pax_apply_2d(&buf, matrix_2d_scale(scale, scale));
+    
+    // Apply sickness.
+    pax_apply_2d(&buf, matrix_2d_translate(y*-0.5*blob->sickness, x*0.5*blob->sickness));
+    pax_apply_2d(&buf, matrix_2d_rotate(M_PI*0.25*blob->sickness));
 
     // Apply blinking.
     if (now >= blob->blinkTime - blinkLength && now <= blob->blinkTime + blinkLength) {

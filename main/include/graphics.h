@@ -7,6 +7,7 @@ class Blob;
 
 #include "main.h"
 #include <pax_gfx.h>
+#include <pax_shaders.h>
 #include <vector>
 #include <set>
 
@@ -192,6 +193,10 @@ class Blob {
         std::vector<AttributeSet> attributes;
         // All attributes that have changed.
         std::set<Attribute::Affects> changes;
+        // Brur.
+        bool redoAll;
+        // How sick this blob is, 0->1.
+        float sickness;
         
         // Position of all arms.
         std::vector<Pos> arms;
@@ -252,10 +257,17 @@ class Blob {
         // Mutate with another blob.
         void mutate(Blob *with);
         
+        // Whether this blob has the same attribute sets as another.
+        bool setsEquals(Blob &other);
+        
         // Send the blob to a given connection.
         void send(Connection *to);
         // Receive blob data from a given connection.
         void receive(Connection *from, const char *topic, const char *data);
+        // Stores the blob to NVS.
+        void storeToNvs();
+        // Loads the blob from NVS.
+        void loadFromNvs();
     private:
         // Calculate the value given by the attributes for a given affected variable.
         int calculateAttribute(Attribute::Affects affects, int min, int max);

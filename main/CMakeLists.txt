@@ -7,4 +7,6 @@ idf_component_register(
         "graphics.cpp"
     INCLUDE_DIRS
         "." "include"
+    EMBED_FILES ${project_dir}/resources/pattern0.png
+    EMBED_FILES ${project_dir}/resources/pattern1.png
 )

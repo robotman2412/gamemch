@@ -12,9 +12,33 @@ Player *localPlayer;
 Player *companion;
 bool hasCompanion;
 bool companionAgrees;
+bool companionMutated;
 Screen currentScreen;
 std::vector<int> companionList;
 int companionListIndex;
+std::vector<Blob> candidates;
+int candidateIndex;
+float introScroll;
+
+const char *introTitle = "Welcome to Spwn!";
+const char *introText =
+    "Spwn is a game about genes.\n\n"
+    
+    "You get a blob, which has moods\n"
+    "and health. You cross horizontal-\n"
+    "gene-transfer style with other\n"
+    "players, but beware! The more you\n"
+    "inbreed, the more sick you become!\n\n"
+    
+    "Spwn will show you nearby players,\n"
+    "which you can ask to play with you.\n"
+    "Press 🅴 when someone's nearby,\n"
+    "walk up to them and ask them to\n"
+    "do the same. Then, press 🆂 again\n"
+    "to cross with their blob.\n\n"
+    
+    "Press 🆂 to continue to the game,\n"
+    "or press 🅷 at any time to exit.\n";
 
 static const char *TAG = "main";
 
@@ -32,6 +56,12 @@ extern "C" void disp_flush() {
 
 // Exits the app, returning to the launcher.
 extern "C" void exit_to_launcher() {
+    // Notify companion.
+    if (hasCompanion) {
+        companion->connection->send("info", "leave");
+    }
+    
+    // Exit to launcher.
     REG_WRITE(RTC_CNTL_STORE0_REG, 0);
     esp_restart();
 }
@@ -67,6 +97,9 @@ extern "C" void app_main() {
     // Load local player.
     localPlayer = loadFromNvs();
     currentScreen = Screen::HOME;
+    // localPlayer->blob->pos.s0 = 0;
+    // localPlayer->blob->pos.s1 = 0;
+    // localPlayer->blob->pos.scale = 0;
     
     while (1) {
         espnow_run_callbacks();
@@ -77,7 +110,7 @@ extern "C" void app_main() {
         
         now = esp_timer_get_time() / 1000;
         
-        if (now >= nextInfoBroadcast) {
+        if (now >= nextInfoBroadcast && currentScreen != Screen::INTRO) {
             // Broadcast info.
             broadcastInfo();
             nextInfoBroadcast = now + broadcastInterval;
@@ -97,6 +130,7 @@ extern "C" void app_main() {
                     if (debugAttrIndex > 0) debugAttrIndex --;
                 }
                 companionListIndex --;
+                introScroll = 0;
                 
             } else if (message.input == RP2040_INPUT_JOYSTICK_DOWN && message.state) {
                 if (currentScreen == Screen::HOME) {
@@ -104,8 +138,34 @@ extern "C" void app_main() {
                     if (debugAttrIndex < attributeSets.size() - 1) debugAttrIndex ++;
                 }
                 companionListIndex ++;
+                introScroll = 1;
+                
+            } else if (message.input == RP2040_INPUT_JOYSTICK_RIGHT && message.state) {
+                if (hasCompanion && candidates.size()) {
+                    Blob *cur = &candidates[candidateIndex];
+                    cur->pos.animateTo(cur->pos.x, cur->pos.y, 20, 500);
+                    
+                    candidateIndex ++;
+                    if (candidateIndex >= candidates.size()) candidateIndex = 0;
+                    
+                    Blob *next = &candidates[candidateIndex];
+                    next->pos.animateTo(next->pos.x, next->pos.y, 35, 500);
+                }
+                
+            } else if (message.input == RP2040_INPUT_JOYSTICK_LEFT && message.state) {
+                if (hasCompanion && candidates.size()) {
+                    Blob *cur = &candidates[candidateIndex];
+                    cur->pos.animateTo(cur->pos.x, cur->pos.y, 20, 500);
+                    
+                    candidateIndex --;
+                    if (candidateIndex < 0) candidateIndex = candidates.size() - 1;
+                    
+                    Blob *next = &candidates[candidateIndex];
+                    next->pos.animateTo(next->pos.x, next->pos.y, 35, 500);
+                }
                 
             } else if (message.input == RP2040_INPUT_BUTTON_ACCEPT && message.state) {
+                #ifdef ENABLE_DEBUG
                 if (currentScreen == Screen::HOME) {
                     // Debug: Toggle set.
                     localPlayer->blob->toggleSet(attributeSets[debugAttrIndex]);
@@ -113,19 +173,33 @@ extern "C" void app_main() {
                     if (companion) {
                         localPlayer->blob->send(companion->connection);
                     }
-                }
+                } else
+                #endif
                 if (currentScreen == Screen::COMP_SELECT) {
                     // Ask thel compañor.
                     currentScreen = Screen::COMP_AWAIT;
                     askCompanion(connections[companionList[companionListIndex]]);
+                } else if (currentScreen == Screen::MUTATE_PICK) {
+                    // Finish the mutation thing.
+                    pickMutation();
+                }
+                
+            } else if (message.input == RP2040_INPUT_BUTTON_START && message.state) {
+                if (currentScreen == Screen::INTRO) {
+                    currentScreen = Screen::HOME;
+                    localPlayer->blob->pos.animateTo(buf.width/2, buf.height/2, 50, 1000);
+                } else if (currentScreen == Screen::HOME && hasCompanion && companionAgrees) {
+                    // Start the mutation procedure.
+                    companion->connection->send("info", "mutate");
+                    startMutation();
                 }
                 
             } else if (message.input == RP2040_INPUT_BUTTON_SELECT && message.state && !hasCompanion) {
-                if (nearby == 1) {
+                if (currentScreen == Screen::HOME && nearby == 1) {
                     // Just ask this one directly.
                     currentScreen = Screen::COMP_AWAIT;
                     askCompanion(firstNearby);
-                } else if (nearby) {
+                } else if (currentScreen == Screen::HOME && nearby) {
                     // Go to the selection menu.
                     currentScreen = Screen::COMP_SELECT;
                 }
@@ -144,28 +218,108 @@ extern "C" void app_main() {
                 }
                 
             } else if (message.input == RP2040_INPUT_JOYSTICK_PRESS && message.state) {
+                #ifdef ENABLE_DEBUG
                 // Debug: Change blob with maximum random.
                 localPlayer->blob->redoAttributes();
                 if (companion) {
                     localPlayer->blob->send(companion->connection);
                 }
+                #endif
                 
             } else if (message.input == RP2040_INPUT_BUTTON_MENU && message.state) {
-                if (hasCompanion) {
-                    // Debug: Do the mutator.
-                    ESP_LOGI(TAG, "Mutating with companion");
-                    localPlayer->blob->mutate(companion->blob);
-                    localPlayer->blob->send(companion->connection);
-                } else {
+                #ifdef ENABLE_DEBUG
+                if (!hasCompanion) {
                     // Debug: Randomise again the attributes.
                     ESP_LOGI(TAG, "Randomising");
                     localPlayer->blob->attributes.clear();
                     localPlayer->blob->initialRandomise();
                 }
-                
+                #endif
             }
         }
     }
+}
+
+
+
+// Create the candidate mutations.
+void startMutation() {
+    candidates.clear();
+    companionMutated = false;
+    
+    // Animate away old blobs.
+    localPlayer->blob->pos.animateTo(buf.width/3, buf.height/2, 0, 1000);
+    companion->blob->pos.animateTo(buf.width*2/3, buf.height/2, 0, 1000);
+    
+    // Make new candidates.
+    candidates.push_back(*localPlayer->blob);
+    candidates[0].mutate(companion->blob);
+    ESP_LOGE(TAG, "Candidate 0 picked");
+    // Up to 5 tries for unique second candidate.
+    candidates.push_back(*localPlayer->blob);
+    for (int i = 0; i < 5 && (!i || candidates[1].setsEquals(candidates[0])); i++) {
+        candidates[1] = *localPlayer->blob;
+        candidates[1].mutate(companion->blob);
+    }
+    ESP_LOGE(TAG, "Candidate 1 picked");
+    // Up to 10 tries for unique third candidate.
+    candidates.push_back(*localPlayer->blob);
+    for (int i = 0; i < 10 && (!i || candidates[2].setsEquals(candidates[0]) || candidates[2].setsEquals(candidates[1])); i++) {
+        candidates[2] = *localPlayer->blob;
+        candidates[2].mutate(companion->blob);
+    }
+    ESP_LOGE(TAG, "Candidate 2 picked");
+    
+    // Set candidate positions.
+    candidates[0].pos.animateTo(320*0.25, 240*0.5, 20, 1000);
+    candidates[1].pos.animateTo(320*0.50, 240*0.5, 35, 1000);
+    candidates[2].pos.animateTo(320*0.75, 240*0.5, 20, 1000);
+    
+    candidateIndex = 1;
+    currentScreen = Screen::MUTATE_PICK;
+}
+
+// Pick the mutation and await our peer.
+void pickMutation() {
+    // Await the pickening from other player.
+    *localPlayer->blob = candidates[candidateIndex];
+    currentScreen = Screen::MUTATE_AWAIT;
+    
+    // Animate back to normal.
+    for (int i = 0; i < candidates.size(); i++) {
+        if (i != candidateIndex) {
+            candidates[i].pos.animateTo(candidates[i].pos.x, candidates[i].pos.y, 0, 1000);
+        }
+    }
+    
+    if (companionMutated) {
+        // Don't await peer.
+        finishMutation();
+        companion->connection->send("info", "mutate_done");
+    } else if (!hasCompanion) {
+        // Finish early.
+        finishMutation();
+    } else {
+        // Await peer.
+        companion->connection->send("info", "mutate_done");
+        localPlayer->blob->pos.animateTo(320*0.50, 240*0.5, 35, 1000);
+    }
+}
+
+// Finish the mutation.
+void finishMutation() {
+    // Pick the mutat.
+    candidateIndex = 0;
+    candidates.clear();
+    currentScreen = Screen::HOME;
+    
+    // Animate back to normal.
+    localPlayer->blob->pos.animateTo(buf.width/3, buf.height/2, 35, 1000);
+    companion->blob->pos.animateTo(buf.width*2/3, buf.height/2, 35, 1000);
+    
+    // Transmit data.
+    localPlayer->blob->send(companion->connection);
+    broadcastInfo();
 }
 
 
@@ -175,6 +329,11 @@ void broadcastInfo() {
     // Advertise our presence by broadcasting our nickname and score.
     espnow_broadcast("nick",              localPlayer->getNick());
     espnow_broadcast_num("blob_body_col", localPlayer->blob->bodyColor);
+    #ifdef ENABLE_DEBUG
+    espnow_broadcast_num("version",       -GAME_VERSION);
+    #else
+    espnow_broadcast_num("version",       GAME_VERSION);
+    #endif
 }
 
 // Ask a connection as companion.
@@ -268,8 +427,26 @@ void mainDataCallback(Connection *from, const char *type, const char *data) {
             if (companion == from->player) {
                 setCompanion(NULL, false);
                 ESP_LOGI(TAG, "In leave %s", from->player->getNick());
+                if (currentScreen == Screen::MUTATE_AWAIT) {
+                    // Finish early.
+                    finishMutation();
+                }
             }
             from->player->askedUsOut = false;
+        } else if (!strcmp(data, "mutate") && hasCompanion) {
+            if (currentScreen == Screen::HOME) {
+                // Temporary start mutating thing.
+                startMutation();
+            }
+            
+        } else if (!strcmp(data, "mutate_done") && hasCompanion) {
+            if (currentScreen == Screen::MUTATE_PICK) {
+                // Companion is done already, remember that.
+                companionMutated = true;
+            } else if (currentScreen == Screen::MUTATE_AWAIT) {
+                // Companion is done, stop waiting.
+                finishMutation();
+            }
         }
     }
 }

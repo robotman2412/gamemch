@@ -15,7 +15,9 @@ typedef union {
 } mac_t;
 std::map<uint64_t, Connection *> espnowConnMap;
 Connection *broadcaster;
-static std::vector<std::pair<Connection *, std::string>> cache;
+xQueueHandle cache;
+typedef std::pair<Connection *, std::string> CachePair;
+// static std::vector<C> cache;
 
 static const uint8_t magic[] = {
     0xde, 0xad, 0xbe, 0xef,
@@ -61,6 +63,8 @@ void espnow_start() {
     conn->peer = strdup("broadcast");
     espnowConnMap[mac_pak] = conn;
     broadcaster = conn;
+    
+    cache = xQueueCreate(32, sizeof(CachePair*));
 }
 
 void espnow_broadcast_raw(const char *msg) {
@@ -93,14 +97,15 @@ void espnow_broadcast_float(const char *topic, float number) {
 }
 
 void espnow_run_callbacks() {
-    for (auto iter = cache.begin(); iter != cache.end();) {
-        Connection *conn = iter->first;
-        std::string data = iter->second;
+    CachePair *item;
+    while (xQueueReceive(cache, &item, 0)) {
+        Connection *conn = item->first;
+        std::string data = item->second;
         
         // Handle data on it.
         conn->onData(data.c_str(), data.length());
         // Dequeue from LIST.
-        iter = cache.erase(iter);
+        delete item;
     }
 }
 
@@ -135,12 +140,11 @@ void espnowRecvCallback(const uint8_t *mac_addr, const uint8_t *data, int data_l
         conn->setStatus(Connection::OPEN);
     }
     // Add it to cache.
-    cache.push_back(
-        std::pair<Connection *, std::string>(
-            conn,
-            std::string((const char *) &data[sizeof(magic)], data_len - sizeof(magic))
-        )
+    CachePair *thing = new CachePair(
+        conn,
+        std::string((const char *) &data[sizeof(magic)], data_len - sizeof(magic))
     );
+    xQueueSend(cache, &thing, pdMS_TO_TICKS(20));
 }
 
 void espnowSendCallback(Connection *from, const char *msg) {

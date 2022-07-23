@@ -1,7 +1,8 @@
 
 #pragma once
 
-// #define ENABLE_DEBUG
+#define ENABLE_DEBUG
+#define GAME_NVS_NAME "robot_spwn"
 
 #ifdef __cplusplus
 extern "C" {
@@ -11,6 +12,7 @@ extern "C" {
 #include "hardware.h"
 // For graphics.
 #include "pax_gfx.h"
+#include "pax_shaders.h"
 // For PNG images.
 #include "pax_codecs.h"
 // The screen driver.
@@ -33,6 +35,9 @@ extern "C" {
 #include "time.h"
 #include "sys/time.h"
 
+// Game version, used to warn players running different versions.
+#define GAME_VERSION 4
+
 // Updates the screen with the last drawing.
 void disp_flush();
 
@@ -44,6 +49,8 @@ void exit_to_launcher();
 #endif //__cplusplus
 
 typedef enum {
+    // Intro screen: info about the game.
+    INTRO,
     // Home screen: not doing much.
     HOME,
     // Companion select screen.
@@ -52,6 +59,8 @@ typedef enum {
     COMP_AWAIT,
     // Pick a mutation.
     MUTATE_PICK,
+    // Await the peer to pick a mutation.
+    MUTATE_AWAIT,
 } Screen;
 
 extern Screen currentScreen;
@@ -77,12 +86,22 @@ extern Player *companion;
 extern bool hasCompanion;
 // Whether the companion player has accepted.
 extern bool companionAgrees;
+// Whether the companion has finished mutating.
+extern bool companionMutated;
 // The list of players eligable to be a companion.
 extern std::vector<int> companionList;
 // The selected player in the companion list.
 extern int companionListIndex;
 // The mutated blobs the player picks from.
-extern std::vector<Blob> mutationCandidates;
+extern std::vector<Blob> candidates;
+// The currently selected mutation candidate.
+extern int candidateIndex;
+// The title for the intro screen.
+extern const char *introTitle;
+// The text for the intro screen.
+extern const char *introText;
+// The scroll for the intro screen.
+extern float introScroll;
 
 extern Connection *broadcaster;
 
@@ -94,6 +113,13 @@ void askCompanion(Connection *to);
 void setCompanion(Connection *to, bool agrees);
 // Refreshes the list of candidate companions.
 void refreshCompanionList();
+
+// Create the candidate mutations.
+void startMutation();
+// Pick the mutation and await our peer.
+void pickMutation();
+// Finish the mutation thing.
+void finishMutation();
 
 // Data event handling.
 void mainDataCallback(Connection *from, const char *type, const char *data);

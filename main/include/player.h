@@ -37,6 +37,13 @@ class Player {
         // Whether this player has asked us to be their companion.
         bool askedUsOut;
         
+        // The version this player is running.
+        int version;
+        // Whether the player is running a debug version.
+        bool versionDebug;
+        // String representation of version.
+        char verStr[32];
+        
         // Make an empty player.
         Player();
         
@@ -63,6 +70,9 @@ class Player {
         int setScore(int newScore);
         // Get a player's score.
         int getScore();
+        
+        // Update the string representation of version.
+        void updateVerStr();
         
         // Set interacting status.
         InteractStatus setStatus(InteractStatus newStatus);

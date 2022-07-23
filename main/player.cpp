@@ -56,23 +56,23 @@ Player *loadFromNvs() {
     nvs_close(nick_handle);
     if (!*nick) strcpy(nick, "Anonymous");
     
-    // Open NVS to read player data.
-    nvs_handle_t local_handle;
-    nvs_open("gamemch", NVS_READONLY, &local_handle);
-    // Read score.
-    int score = 0;
-    nvs_get_i32(local_handle, "score", &score);
-    nvs_close(local_handle);
-    
     // Create player.
     Player *player = new Player(nick);
-    player->setScore(score);
     // Because this is you as a player, broadcast all updates.
     player->doBroadcast = true;
     
     // Set the BLOB.
     player->blob = new Blob();
     player->blob->initialRandomise();
+    
+    // Set the version.
+    player->version = GAME_VERSION;
+    #ifdef ENABLE_DEBUG
+    player->versionDebug = true;
+    #else
+    player->versionDebug = false;
+    #endif
+    player->updateVerStr();
     
     // Clean up.
     delete nick;
@@ -88,13 +88,17 @@ void storeToNvs(Player *player) {
 
 // Make an empty player.
 Player::Player() {
-    score       = 0;
-    nickname    = strdup("Player");
-    status      = InteractStatus::IDLE;
-    doBroadcast = false;
-    blob        = new Blob();
-    connection  = NULL;
-    askedUsOut  = false;
+    score        = 0;
+    nickname     = strdup("Player");
+    status       = InteractStatus::IDLE;
+    doBroadcast  = false;
+    blob         = new Blob();
+    connection   = NULL;
+    askedUsOut   = false;
+    // Default version is v1 debug, because v2 is the first to track versions.
+    version      = 1;
+    versionDebug = true;
+    strcpy(verStr, "v1 prerelease");
 }
 
 // Make a new player.
@@ -106,6 +110,10 @@ Player::Player(const char *newNickname) {
     doBroadcast = false;
     connection  = NULL;
     askedUsOut  = false;
+    // Default version is v1 debug, because v2 is the first to track versions.
+    version      = 1;
+    versionDebug = true;
+    strcpy(verStr, "v1 prerelease");
 }
 
 Player::~Player() {
@@ -118,15 +126,15 @@ Player::~Player() {
 
 // Handle a message for this player.
 void Player::dataCallback(Connection *from, const char *type, const char *data) {
-    if (!strcmp(type, "score")) {
-        // Check if it's a number.
-        bool isnum = strspn(data, "0123456789") == strlen(data);
-        if (isnum) {
-            setScore(atoi(data));
-        }
-    } else if (!strcmp(type, "nick")) {
+    if (!strcmp(type, "nick")) {
         // Literally any nickname is valid.
         setNick(data);
+    } else if (!strcmp(type, "version")) {
+        // Receive version.
+        int num      = atoi(data);
+        versionDebug = num < 0;
+        version      = num < 0 ? -num : num;
+        updateVerStr();
     } else if (!strncmp(type, "blob_", 5)) {
         // Data for the blob.
         blob->receive(from, type, data);
@@ -189,6 +197,11 @@ int Player::setScore(int newScore) {
 // Get a player's score.
 int Player::getScore() {
     return score;
+}
+
+// Update the string representation of version.
+void Player::updateVerStr() {
+    snprintf(verStr, 32, versionDebug ? "v%d prerelease" : "v%d", version);
 }
 
 
