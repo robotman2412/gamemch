@@ -628,23 +628,24 @@ void Blob::draw(const char *name) {
     pax_apply_2d(&buf, matrix_2d_scale(1+sickness*0.2, 1));
     
     
-    pax_quad_t uvs = {
-        .x0 = 0, .y0 = 0,
-        .x1 = 9, .y1 = 0,
-        .x2 = 9, .y2 = 9,
-        .x3 = 0, .y3 = 9,
-    };
-    pax_shader_t shader = PAX_SHADER_TEXTURE(&pattern0);
+    // pax_quad_t uvs = {
+    //     .x0 = 0, .y0 = 0,
+    //     .x1 = 9, .y1 = 0,
+    //     .x2 = 9, .y2 = 9,
+    //     .x3 = 0, .y3 = 9,
+    // };
+    // pax_shader_t shader = PAX_SHADER_TEXTURE(&pattern0);
     switch (body) {
         default:
         case(SQUARE):
             // Square body.
             pax_draw_rect(&buf, altColor,  -1, -1, 2, 2);
-            pax_shade_rect(
-                &buf, bodyColor,
-                &shader, &uvs,
-                edge-1, edge-1, 2-2*edge, 2-2*edge
-            );
+            // pax_shade_rect(
+            //     &buf, bodyColor,
+            //     &shader, &uvs,
+            //     edge-1, edge-1, 2-2*edge, 2-2*edge
+            // );
+            pax_draw_rect(&buf, bodyColor, edge-1, edge-1, 2-2*edge, 2-2*edge);
             break;
         case(PENTAGON):
             // Pentagonal body.
